@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+:root {
+  --sky: #7ec8e3;
+  --sky-deep: #3a9bc7;
+  --sun: #ffd56b;
+  --coral: #ff8a6b;
+  --mint: #7ddea5;
+  --ink: #2c3e50;
+  --paper: #f7fbff;
+  --card: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Nunito', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 18%, #ffe8a3 0%, transparent 42%),
+    radial-gradient(circle at 88% 8%, #b8ecff 0%, transparent 40%),
+    linear-gradient(180deg, #eef9ff 0%, #f7fbff 55%, #e8f6ef 100%);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
