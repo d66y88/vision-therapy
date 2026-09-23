@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ColorCalibration } from './ColorCalibration'
 import { ParentDashboard } from './ParentDashboard'
 import {
+  ALLOWED_E_TARGETS_MIN,
   getETargetMs,
   setETargetMs,
   focusSentence,
@@ -159,7 +160,7 @@ export function ParentShell({
         <div className="rounded-3xl bg-indigo-50 p-6 ring-1 ring-indigo-100">
           <h2 className="text-2xl font-black text-slate-800">医院演示</h2>
           <p className="mt-2 text-base text-slate-600">
-            约 8 分钟：必要时校准 + 精选 3 关，方便门诊展示。
+            约 8 分钟：必要时校准 + Gabor 找斑点、红蓝天平、灯光跳跳，讲清分辨 / 双眼 / 眼球运动。
           </p>
           <button
             type="button"
@@ -249,7 +250,7 @@ function DoseSettings() {
           打卡所需有效分钟
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {[10, 12, 15].map((m) => {
+          {ALLOWED_E_TARGETS_MIN.map((m) => {
             const ms = m * 60 * 1000
             return (
               <button
@@ -271,7 +272,7 @@ function DoseSettings() {
           })}
         </div>
         <p className="mt-3 text-base text-slate-500">
-          默认 12。还须完成今日必练课表才能打卡。
+          默认 18。还须完成今日必练课表才能打卡。
         </p>
       </div>
     </section>

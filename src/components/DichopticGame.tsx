@@ -46,16 +46,19 @@ interface GameSnapshot {
   score: number
   lives: number
   distance: number
+  goal: number
+  phase: number
   message: string
 }
 
 const FRAME = 28
-const PLAYER_W = 44
-const PLAYER_H = 36
+const PLAYER_W = 48
+const PLAYER_H = 40
 const SCROLL_SPEED = 110
 const PLAYER_SPEED = 220
 const SPAWN_COIN_MS = 1400
 const SPAWN_OBS_MS = 2200
+const COIN_GOAL = 12
 
 function drawFusionFrame(
   ctx: CanvasRenderingContext2D,
@@ -101,24 +104,29 @@ function drawBear(
   color: string,
 ): void {
   ctx.fillStyle = color
-  // body
   ctx.beginPath()
-  ctx.roundRect(x, y + 8, PLAYER_W, PLAYER_H - 8, 10)
+  ctx.roundRect(x, y + 10, PLAYER_W, PLAYER_H - 10, 12)
   ctx.fill()
-  // head
   ctx.beginPath()
-  ctx.arc(x + PLAYER_W / 2, y + 10, 14, 0, Math.PI * 2)
+  ctx.arc(x + PLAYER_W / 2, y + 12, 16, 0, Math.PI * 2)
   ctx.fill()
-  // ears
   ctx.beginPath()
-  ctx.arc(x + 10, y + 2, 6, 0, Math.PI * 2)
-  ctx.arc(x + PLAYER_W - 10, y + 2, 6, 0, Math.PI * 2)
+  ctx.arc(x + 11, y + 2, 7, 0, Math.PI * 2)
+  ctx.arc(x + PLAYER_W - 11, y + 2, 7, 0, Math.PI * 2)
   ctx.fill()
-  // eyes (dark so visible on blue)
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'
+  ctx.beginPath()
+  ctx.ellipse(x + PLAYER_W / 2 - 4, y + 18, 10, 6, -0.3, 0, Math.PI * 2)
+  ctx.fill()
   ctx.fillStyle = '#001018'
   ctx.beginPath()
-  ctx.arc(x + PLAYER_W / 2 - 5, y + 8, 2.2, 0, Math.PI * 2)
-  ctx.arc(x + PLAYER_W / 2 + 5, y + 8, 2.2, 0, Math.PI * 2)
+  ctx.arc(x + PLAYER_W / 2 - 5, y + 10, 2.4, 0, Math.PI * 2)
+  ctx.arc(x + PLAYER_W / 2 + 5, y + 10, 2.4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#fff'
+  ctx.beginPath()
+  ctx.arc(x + PLAYER_W / 2 - 4, y + 9, 0.9, 0, Math.PI * 2)
+  ctx.arc(x + PLAYER_W / 2 + 6, y + 9, 0.9, 0, Math.PI * 2)
   ctx.fill()
 }
 
@@ -135,8 +143,12 @@ function drawCoin(
   ctx.strokeStyle = 'rgba(0,0,0,0.35)'
   ctx.lineWidth = 2
   ctx.stroke()
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'
-  ctx.font = 'bold 12px Nunito, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.45)'
+  ctx.beginPath()
+  ctx.arc(coin.x - 3, coin.y - 4, coin.r * 0.35, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'
+  ctx.font = 'bold 13px Nunito, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText('★', coin.x, coin.y + 1)
@@ -183,13 +195,17 @@ export function DichopticGame() {
   const statsRef = useRef({ score: 0, lives: 3, distance: 0 })
   const dichopticCountsRef = useRef({ redHits: 0, blueCollisions: 0 })
   const hudSyncAtRef = useRef(0)
+  const speedMulRef = useRef(1)
+  const phaseRef = useRef(1)
 
   const [running, setRunning] = useState(false)
   const [snap, setSnap] = useState<GameSnapshot>({
     score: 0,
     lives: 3,
     distance: 0,
-    message: '戴上红蓝眼镜：红=赛道/金币，蓝=小熊/障碍',
+    goal: COIN_GOAL,
+    phase: 1,
+    message: '戴上红蓝眼镜：红=赛道/金币，蓝=小熊/障碍 · 目标收 12 星',
   })
 
   runningRef.current = running
@@ -214,11 +230,15 @@ export function DichopticGame() {
     lastTsRef.current = 0
     statsRef.current = { score: 0, lives: 3, distance: 0 }
     dichopticCountsRef.current = { redHits: 0, blueCollisions: 0 }
+    speedMulRef.current = 1
+    phaseRef.current = 1
     setSnap({
       score: 0,
       lives: 3,
       distance: 0,
-      message: '方向键或上下滑动控制小熊，收集红星，避开蓝障碍！',
+      goal: COIN_GOAL,
+      phase: 1,
+      message: '方向键或上下滑动：收集 12 颗红星，躲开蓝障碍！',
     })
   }, [])
 
@@ -280,9 +300,9 @@ export function DichopticGame() {
       const { w, h } = viewRef.current
       const fieldTop = FRAME + 8
       const fieldBottom = h - FRAME - 8
-      const scroll = SCROLL_SPEED * dt
+      const scroll = SCROLL_SPEED * speedMulRef.current * dt
 
-      // Player movement
+      // Player movement — small dead-zone via swipe helper already; damp tiny drift
       let vy = 0
       if (keysRef.current.up) vy -= 1
       if (keysRef.current.down) vy += 1
@@ -385,13 +405,20 @@ export function DichopticGame() {
           redHits: dichopticCountsRef.current.redHits,
           blueCollisions: dichopticCountsRef.current.blueCollisions,
         })
-        hudMessage = '收集到红星！双眼合作真棒！'
+        if (statsRef.current.score >= COIN_GOAL * phaseRef.current) {
+          phaseRef.current += 1
+          speedMulRef.current = Math.min(1.55, 1 + (phaseRef.current - 1) * 0.12)
+          hudMessage = `进入第 ${phaseRef.current} 段！速度更快一点点～`
+        } else {
+          const left = COIN_GOAL * phaseRef.current - statsRef.current.score
+          hudMessage = `收集到红星！本段再收 ${left} 颗`
+        }
       }
 
       if (hit) {
         statsRef.current.lives = Math.max(0, statsRef.current.lives - 1)
         dichopticCountsRef.current.blueCollisions += 1
-        invulnUntilRef.current = ts + 1200
+        invulnUntilRef.current = ts + 1400
         playTone('error')
         recordTrial('miss', null, 0)
         setClinical({
@@ -406,12 +433,14 @@ export function DichopticGame() {
             void end({ save: true })
           })
         } else {
-          hudMessage = '另一只眼睛也要一起看～小心蓝障碍'
+          hudMessage = '蓝障碍撞到啦（另一只眼也要看）· 短暂无敌'
         }
         setSnap({
           score: statsRef.current.score,
           lives: statsRef.current.lives,
           distance: statsRef.current.distance,
+          goal: COIN_GOAL * phaseRef.current,
+          phase: phaseRef.current,
           message: hudMessage,
         })
       } else if (scoreGain > 0) {
@@ -419,6 +448,8 @@ export function DichopticGame() {
           score: statsRef.current.score,
           lives: statsRef.current.lives,
           distance: statsRef.current.distance,
+          goal: COIN_GOAL * phaseRef.current,
+          phase: phaseRef.current,
           message: hudMessage!,
         })
       } else if (ts - hudSyncAtRef.current > 200) {
@@ -426,6 +457,8 @@ export function DichopticGame() {
         setSnap((prev) => ({
           ...prev,
           distance: statsRef.current.distance,
+          phase: phaseRef.current,
+          goal: COIN_GOAL * phaseRef.current,
         }))
       }
 
@@ -618,9 +651,9 @@ function DichopticBody({
       )}
 
       <GameHud>
-        <GameHudStat label="红星得分" value={`${snap.score}`} />
+        <GameHudStat label="红星" value={`${snap.score}/${snap.goal}`} />
         <GameHudStat label="生命" value={`${snap.lives}`} />
-        <GameHudStat label="路程" value={`${Math.floor(snap.distance)}m`} />
+        <GameHudStat label="阶段" value={`${snap.phase}`} />
         {isFullscreen && (
           <p className="ml-auto self-center text-xs font-bold text-white/70">
             {snap.message}

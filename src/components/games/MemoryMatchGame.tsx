@@ -19,10 +19,10 @@ interface Card {
   matched: boolean
 }
 
-const SYMBOLS = ['★', '●', '▲', '■', '◆', '♥']
+const SYMBOLS = ['★', '●', '▲', '■', '◆', '♥', '✿', '✦']
 
-function buildDeck(): Card[] {
-  const picks = SYMBOLS.slice(0, 6)
+function buildDeck(pairCount: number): Card[] {
+  const picks = SYMBOLS.slice(0, Math.min(pairCount, SYMBOLS.length))
   const cards: Card[] = []
   let id = 1
   for (const symbol of picks) {
@@ -52,7 +52,10 @@ export function MemoryMatchGame() {
   const [flipped, setFlipped] = useState<number[]>([])
   const [lockBoard, setLockBoard] = useState(false)
   const [score, setScore] = useState({ hits: 0, misses: 0 })
-  const [message, setMessage] = useState('戴眼镜：翻开一红一蓝，符号相同即配对')
+  const [message, setMessage] = useState(
+    '戴眼镜：必须一红一蓝翻开，符号相同才配对（两只眼睛都要看见）',
+  )
+  const [pairGoal, setPairGoal] = useState(6)
 
   const flippedRef = useRef<number[]>([])
   const lockRef = useRef(false)
@@ -150,7 +153,8 @@ export function MemoryMatchGame() {
             return
           }
           endingRef.current = false
-          const deck = buildDeck()
+          const pairs = pairGoal
+          const deck = buildDeck(pairs)
           cardsRef.current = deck
           flippedRef.current = []
           lockRef.current = false
@@ -159,7 +163,7 @@ export function MemoryMatchGame() {
           setLockBoard(false)
           setScore({ hits: 0, misses: 0 })
           setRunning(true)
-          setMessage('戴眼镜：翻开一红一蓝，符号相同即配对')
+          setMessage('记住：一红一蓝 + 同一符号。两只眼睛都要看见！')
           playTone('tick')
         }}
         onEnd={() => {
@@ -167,6 +171,8 @@ export function MemoryMatchGame() {
           void end({ save: true })
           setMessage('已保存本局记录')
         }}
+        pairGoal={pairGoal}
+        onPairGoal={setPairGoal}
       />
     </GameShell>
   )
@@ -184,6 +190,8 @@ function MemoryBody({
   onFlip,
   onStart,
   onEnd,
+  pairGoal,
+  onPairGoal,
 }: {
   cards: Card[]
   running: boolean
@@ -196,6 +204,8 @@ function MemoryBody({
   onFlip: (id: number) => void
   onStart: () => void
   onEnd: () => void
+  pairGoal: number
+  onPairGoal: (n: number) => void
 }) {
   const { isFullscreen } = useGameShell()
   return (
@@ -216,6 +226,25 @@ function MemoryBody({
       </GameHud>
       {!isFullscreen && (
         <p className="mb-3 text-center text-base font-extrabold text-slate-700">{message}</p>
+      )}
+
+      {!running && (
+        <div className="mb-3 flex flex-wrap justify-center gap-2">
+          {[4, 6, 8].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onPairGoal(n)}
+              className={`min-h-12 rounded-2xl px-4 text-base font-extrabold ${
+                pairGoal === n
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-white text-slate-600 ring-1 ring-slate-200'
+              }`}
+            >
+              {n} 对
+            </button>
+          ))}
+        </div>
       )}
 
       <div
@@ -248,12 +277,16 @@ function MemoryBody({
                 onClick={() => onFlip(card.id)}
                 className={
                   isFullscreen
-                    ? 'flex min-h-[18vmin] items-center justify-center rounded-2xl text-4xl font-black shadow-sm transition active:scale-95 disabled:opacity-70'
-                    : 'flex min-h-20 items-center justify-center rounded-2xl text-3xl font-black shadow-sm ring-1 ring-slate-200 transition active:scale-95 disabled:opacity-70 sm:min-h-24'
+                    ? 'flex min-h-[18vmin] items-center justify-center rounded-2xl text-4xl font-black shadow-md transition duration-200 active:scale-95 disabled:opacity-70'
+                    : 'flex min-h-20 items-center justify-center rounded-2xl text-3xl font-black shadow-md ring-1 ring-slate-200 transition duration-200 active:scale-95 disabled:opacity-70 sm:min-h-24'
                 }
                 style={{
                   background: open ? color : '#1e293b',
                   color: open ? '#fff' : '#94a3b8',
+                  transform: open ? 'rotateY(0deg)' : undefined,
+                  boxShadow: open
+                    ? `0 0 0 3px ${card.channel === 'red' ? 'rgba(244,63,94,0.35)' : 'rgba(59,130,246,0.35)'}`
+                    : undefined,
                 }}
               >
                 {open ? card.symbol : '?'}
@@ -265,13 +298,13 @@ function MemoryBody({
 
       <GameControls>
         {!running ? (
-          <button type="button" className="min-h-12 rounded-2xl bg-emerald-500 px-6 py-3 font-extrabold text-white" onClick={onStart}>
+          <button type="button" className="min-h-14 rounded-2xl bg-emerald-500 px-6 py-3 text-lg font-extrabold text-white" onClick={onStart}>
             开始训练
           </button>
         ) : (
           <button
             type="button"
-            className={isFullscreen ? 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-900' : 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-700 ring-1 ring-slate-200'}
+            className={isFullscreen ? 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-900' : 'min-h-14 rounded-2xl bg-white px-6 py-3 text-lg font-extrabold text-slate-700 ring-1 ring-slate-200'}
             onClick={onEnd}
           >
             结束并保存

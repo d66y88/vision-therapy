@@ -77,6 +77,11 @@ export function useTrainingSession(module: TrainingModule) {
   const draftRef = useRef<SessionDraft | null>(null)
   const endingRef = useRef(false)
 
+  // Landing on a game screen must not inherit a stuck running dose timer.
+  useEffect(() => {
+    if (!draftRef.current) pauseTraining()
+  }, [pauseTraining])
+
   const begin = useCallback(() => {
     const ok = startTraining()
     if (!ok) return false

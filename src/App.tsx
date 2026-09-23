@@ -25,12 +25,13 @@ import {
   suppressNextPlaylistAdvance,
 } from './lib/playlistProgress'
 import { useColorConfigStore } from './store/colorConfigStore'
+import { useTrainingTimerStore } from './store/trainingTimerStore'
 
 type Shell = 'kid' | 'parent'
 type KidView = 'home' | 'play' | 'intro' | 'calibration'
 
-/** Clinic demo: calibrate → 3 curated games briefly. */
-const DEMO_GAMES: GameId[] = ['gabor', 'dichoptic', 'orient']
+/** Clinic demo: acuity + dichoptic balance + saccades. */
+const DEMO_GAMES: GameId[] = ['gabor', 'contrastBalance', 'saccadeJump']
 
 function App() {
   const [shell, setShell] = useState<Shell>('kid')
@@ -56,7 +57,8 @@ function App() {
       activeGame === 'pursuit' ||
       activeGame === 'orient' ||
       activeGame === 'fixate' ||
-      activeGame === 'bubbleRush')
+      activeGame === 'bubbleRush' ||
+      activeGame === 'saccadeJump')
 
   const launchGame = useCallback(
     (id: GameId, opts?: { skipRitual?: boolean }) => {
@@ -151,6 +153,15 @@ function App() {
     })
     return () => setPlaylistAdvanceHandler(null)
   }, [advanceAfterGame])
+
+  // Dose bar must only advance during an active game session — never on home,
+  // rituals, calibration, intro, or parent shell.
+  useEffect(() => {
+    const inActivePlay = shell === 'kid' && view === 'play' && activeGame != null
+    if (!inActivePlay) {
+      useTrainingTimerStore.getState().pauseTraining()
+    }
+  }, [shell, view, activeGame])
 
   const onRitualDone = () => {
     const kind = ritual

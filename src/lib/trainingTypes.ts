@@ -31,6 +31,14 @@ export interface ClinicalMetrics {
   playlistPeriod?: number
   /** Behavior-based focus average 0–100 for the session. */
   focusAvg?: number
+  /** StereoNear: final disparity in CSS pixels (smaller = harder). */
+  finalDisparityPx?: number
+  /** SaccadeJump: mean reaction time ms. */
+  meanSaccadeRtMs?: number
+  /** ContrastBalance: fellow-eye contrast 0–1 (lower = more balance challenge). */
+  fellowContrast?: number
+  /** ContrastBalance: which channel is treated as amblyopic eye. */
+  amblyopicEye?: 'red' | 'blue'
 }
 
 export interface TrainingSession {
@@ -53,8 +61,8 @@ export interface TrainingSession {
   clinical?: ClinicalMetrics
 }
 
-/** Wall-clock hard cap (20 minutes). */
-export const TRAINING_LIMIT_MS = 20 * 60 * 1000
+/** Wall-clock hard cap — keep in sync with focusScore.WALL_HARD_CAP_MS. */
+export const TRAINING_LIMIT_MS = 30 * 60 * 1000
 export const BREAK_DURATION_MS = 3 * 60 * 1000
 
 /**

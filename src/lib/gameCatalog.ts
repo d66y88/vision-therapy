@@ -9,6 +9,9 @@ export type GameId =
   | 'memory'
   | 'fixate'
   | 'bubbleRush'
+  | 'saccadeJump'
+  | 'stereoNear'
+  | 'contrastBalance'
 
 export type GameFocus =
   | 'acuity'
@@ -17,6 +20,8 @@ export type GameFocus =
   | 'fusion'
   | 'reaction'
   | 'memory'
+  | 'saccade'
+  | 'stereo'
 
 export interface GameDef {
   id: GameId
@@ -79,7 +84,7 @@ export const GAME_CATALOG: GameDef[] = [
     id: 'memory',
     title: '红蓝翻翻乐',
     short: '红蓝配对记忆，双眼都要看见',
-    focus: 'memory',
+    focus: 'anti-suppression',
     needsGlasses: true,
     tone: 'from-lime-100 to-emerald-50',
     minutesHint: '3–4 分钟',
@@ -101,6 +106,33 @@ export const GAME_CATALOG: GameDef[] = [
     needsGlasses: false,
     tone: 'from-teal-100 to-cyan-50',
     minutesHint: '2–3 分钟',
+  },
+  {
+    id: 'saccadeJump',
+    title: '灯光跳跳',
+    short: '亮灯跳到哪格就点哪格，练眼球扫视',
+    focus: 'saccade',
+    needsGlasses: false,
+    tone: 'from-violet-100 to-fuchsia-50',
+    minutesHint: '2–4 分钟',
+  },
+  {
+    id: 'stereoNear',
+    title: '谁更近',
+    short: '戴眼镜看谁更近，练立体深度',
+    focus: 'stereo',
+    needsGlasses: true,
+    tone: 'from-indigo-100 to-sky-50',
+    minutesHint: '2–4 分钟',
+  },
+  {
+    id: 'contrastBalance',
+    title: '红蓝天平',
+    short: '弱视眼找宝藏，健眼干扰变淡，练抗抑制',
+    focus: 'anti-suppression',
+    needsGlasses: true,
+    tone: 'from-pink-100 to-rose-50',
+    minutesHint: '3–5 分钟',
   },
 ]
 

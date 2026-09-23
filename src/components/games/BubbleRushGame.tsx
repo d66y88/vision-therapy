@@ -34,9 +34,13 @@ export function BubbleRushGame() {
   const sizeRef = useRef({ w: 640, h: 420 })
   const runningRef = useRef(false)
 
+  const spawnGapRef = useRef(800)
+  const ttlBaseRef = useRef(2400)
+  const popsRef = useRef<Array<{ x: number; y: number; born: number }>>([])
+
   const [running, setRunning] = useState(false)
   const [score, setScore] = useState({ hits: 0, misses: 0 })
-  const [message, setMessage] = useState('泡泡一出现就快点破！')
+  const [message, setMessage] = useState('盯住中间小点，四周泡泡一出现就点破！')
 
   runningRef.current = running
 
@@ -91,9 +95,9 @@ export function BubbleRushGame() {
           y,
           r: 26 + Math.random() * 14,
           born: now,
-          ttl: 2400 + Math.random() * 900,
+          ttl: ttlBaseRef.current + Math.random() * 700,
         })
-        spawnAtRef.current = now + 750 + Math.random() * 650
+        spawnAtRef.current = now + spawnGapRef.current + Math.random() * 400
       }
 
       const before = bubblesRef.current.length
@@ -102,7 +106,11 @@ export function BubbleRushGame() {
       if (expired > 0) {
         for (let i = 0; i < expired; i += 1) recordTrial('miss', null, 0)
         setScore((s) => ({ ...s, misses: s.misses + expired }))
+        spawnGapRef.current = Math.min(1200, spawnGapRef.current + 40)
+        ttlBaseRef.current = Math.min(3000, ttlBaseRef.current + 80)
       }
+
+      popsRef.current = popsRef.current.filter((p) => now - p.born < 280)
 
       fillSquareGrating(ctx, 0, 0, w, h, {
         barWidth: 28,
@@ -112,19 +120,55 @@ export function BubbleRushGame() {
         phase: (now * 0.008) % 56,
         alpha: 1,
       })
+      // Stronger central fixation
+      ctx.fillStyle = 'rgba(15,23,42,0.2)'
+      ctx.beginPath()
+      ctx.arc(w / 2, h / 2, 18, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#0f172a'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(w / 2 - 10, h / 2)
+      ctx.lineTo(w / 2 + 10, h / 2)
+      ctx.moveTo(w / 2, h / 2 - 10)
+      ctx.lineTo(w / 2, h / 2 + 10)
+      ctx.stroke()
       ctx.fillStyle = '#0f172a'
       ctx.beginPath()
-      ctx.arc(w / 2, h / 2, 4, 0, Math.PI * 2)
+      ctx.arc(w / 2, h / 2, 5, 0, Math.PI * 2)
       ctx.fill()
 
       for (const b of bubblesRef.current) {
         const life = 1 - (now - b.born) / b.ttl
+        const g = ctx.createRadialGradient(
+          b.x - b.r * 0.3,
+          b.y - b.r * 0.35,
+          2,
+          b.x,
+          b.y,
+          b.r,
+        )
+        g.addColorStop(0, `rgba(186,230,253,${0.55 + life * 0.35})`)
+        g.addColorStop(1, `rgba(14,165,233,${0.35 + life * 0.4})`)
         ctx.beginPath()
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(14,165,233,${0.35 + life * 0.5})`
+        ctx.fillStyle = g
         ctx.fill()
         ctx.strokeStyle = '#0369a1'
         ctx.lineWidth = 3
+        ctx.stroke()
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'
+        ctx.beginPath()
+        ctx.ellipse(b.x - b.r * 0.28, b.y - b.r * 0.32, b.r * 0.28, b.r * 0.18, -0.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      for (const p of popsRef.current) {
+        const age = (now - p.born) / 280
+        ctx.strokeStyle = `rgba(14,165,233,${1 - age})`
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 12 + age * 28, 0, Math.PI * 2)
         ctx.stroke()
       }
 
@@ -150,10 +194,20 @@ export function BubbleRushGame() {
         return
       }
       bubblesRef.current = bubblesRef.current.filter((b) => b.id !== hit.id)
+      popsRef.current.push({ x: hit.x, y: hit.y, born: performance.now() })
       recordTrial('hit', performance.now() - hit.born, 1)
-      setScore((s) => ({ ...s, hits: s.hits + 1 }))
+      setScore((s) => {
+        const hits = s.hits + 1
+        if (hits > 0 && hits % 6 === 0) {
+          spawnGapRef.current = Math.max(420, spawnGapRef.current - 50)
+          ttlBaseRef.current = Math.max(1600, ttlBaseRef.current - 100)
+          setMessage('更快啦！继续盯中间、点周边～')
+        } else {
+          setMessage('破！继续～')
+        }
+        return { ...s, hits }
+      })
       playTone('success')
-      setMessage('破！继续～')
     },
     [running, recordTrial],
   )
@@ -179,8 +233,12 @@ export function BubbleRushGame() {
             return
           }
           bubblesRef.current = []
+          popsRef.current = []
+          spawnGapRef.current = 800
+          ttlBaseRef.current = 2400
           setScore({ hits: 0, misses: 0 })
           spawnAtRef.current = 0
+          setMessage('盯住中间十字，四周冒泡就点破')
           setRunning(true)
           playTone('tick')
           requestAnimationFrame(syncSize)

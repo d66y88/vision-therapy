@@ -95,3 +95,28 @@ export function gaborStartContrastForLevel(baseContrast: number, level: number):
   const factor = 1 - level * 0.08
   return Math.min(1, Math.max(0.25, baseContrast * factor))
 }
+
+/** Orient fish start size: higher level → smaller (harder). */
+export function orientStartSizeForLevel(level: number): number {
+  return Math.round(Math.min(120, Math.max(52, 96 - level * 10)))
+}
+
+/** Pursuit path speed multiplier. */
+export function pursuitSpeedForLevel(level: number): number {
+  return Math.min(1.45, Math.max(0.7, 1 + level * 0.12))
+}
+
+/** Saccade grid: 3×3 at easy, 4×4 at hard. */
+export function saccadeGridForLevel(level: number): 3 | 4 {
+  return level >= 1 ? 4 : 3
+}
+
+/** Stereo starting disparity in px (larger = easier). */
+export function stereoStartDisparityForLevel(level: number): number {
+  return Math.round(Math.min(48, Math.max(10, 28 - level * 5)))
+}
+
+/** ContrastBalance fellow-eye start contrast (lower = harder). */
+export function fellowContrastForLevel(level: number): number {
+  return Math.min(0.95, Math.max(0.35, 0.78 - level * 0.08))
+}

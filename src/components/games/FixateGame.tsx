@@ -91,8 +91,17 @@ export function FixateGame() {
       ctx.arc(t.x, t.y, t.paused ? 22 : 14, 0, Math.PI * 2)
       ctx.fill()
       if (t.paused) {
-        ctx.strokeStyle = '#fff'
-        ctx.lineWidth = 3
+        const left = Math.max(0, t.pauseUntil - now)
+        const frac = left / 1400
+        ctx.beginPath()
+        ctx.arc(t.x, t.y, 32, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+        ctx.lineWidth = 5
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(t.x, t.y, 32, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac)
+        ctx.strokeStyle = '#fbbf24'
+        ctx.lineWidth = 5
         ctx.stroke()
       }
 
@@ -111,7 +120,7 @@ export function FixateGame() {
     const y = clientY - rect.top
     const t = targetRef.current
     if (!t.paused) {
-      // Moving — ignore tap (do not count as miss)
+      setMessage('等它停下发亮再点～现在还在飞')
       return
     }
     const hit = Math.hypot(t.x - x, t.y - y) <= 28
@@ -151,6 +160,7 @@ export function FixateGame() {
             return
           }
           setScore({ hits: 0, misses: 0 })
+          setMessage('光点停下并亮起倒计时环时，马上点中')
           setRunning(true)
           playTone('tick')
           requestAnimationFrame(syncSize)
@@ -158,7 +168,11 @@ export function FixateGame() {
         onEnd={() => {
           setRunning(false)
           void end({ save: true })
-          setMessage('已保存本局记录')
+          setMessage(
+            accuracy >= 70
+              ? `注视抓住 ${accuracy}%，很稳！`
+              : '已保存本局记录',
+          )
         }}
       />
     </GameShell>

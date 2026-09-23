@@ -5,13 +5,15 @@
 
 export const FOCUS_SCORE_MIN = 0.7
 export const FOCUS_SCORE_MAX = 1.25
-/** Default effective-minute target for daily check-in (12 min). */
-export const DEFAULT_E_TARGET_MS = 12 * 60 * 1000
-/** Wall-clock hard cap (20 min) — never exceeded. */
-export const WALL_HARD_CAP_MS = 20 * 60 * 1000
+/** Default effective-minute target for daily check-in (18 min). */
+export const DEFAULT_E_TARGET_MS = 18 * 60 * 1000
+/** Wall-clock hard cap (30 min) — never exceeded. */
+export const WALL_HARD_CAP_MS = 30 * 60 * 1000
 
 const E_TARGET_KEY = 'vision_e_target_ms'
-const ALLOWED_TARGETS = [10, 12, 15].map((m) => m * 60 * 1000)
+/** Parent-selectable check-in targets (minutes → ms). */
+export const ALLOWED_E_TARGETS_MIN = [15, 18, 20, 25] as const
+const ALLOWED_TARGETS = ALLOWED_E_TARGETS_MIN.map((m) => m * 60 * 1000)
 
 export function getETargetMs(): number {
   try {

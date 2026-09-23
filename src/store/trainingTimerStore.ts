@@ -130,8 +130,10 @@ function hydrate(): Pick<
     }
   }
 
-  return {
-    phase: 'idle',
+  // Never resume mid-flight after reload — only count time while a game session
+  // is actively running. Rewrite storage if a prior crash left phase=training.
+  const idle = {
+    phase: 'idle' as const,
     elapsedMs: Math.min(saved.elapsedMs, TRAINING_LIMIT_MS),
     effectiveMs,
     focusScore: 1,
@@ -140,6 +142,16 @@ function hydrate(): Pick<
     lastAccrueAt: null,
     breakEndsAt: null,
   }
+  if (saved.phase === 'training') {
+    persist({
+      phase: 'idle',
+      elapsedMs: idle.elapsedMs,
+      effectiveMs,
+      breakEndsAt: null,
+      dayKey: today,
+    })
+  }
+  return idle
 }
 
 function lockNow(

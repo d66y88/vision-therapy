@@ -71,9 +71,11 @@
 2. **阶段二：** GaborGame Canvas + 阶梯自适应
 3. **阶段三：** DichopticGame 红蓝分视游戏
 4. **阶段四：** TrainingTimer + ParentDashboard + IndexedDB
+5. **阶段五（已落地）：** 游戏库扩至 11 关；新增扫视 `saccadeJump`、立体视 `stereoNear`、对比度平衡抗抑制 `contrastBalance`；核心关画面/玩法/交互抛光；课表仍 4–6 关且 ≥1 acuity + ≥1 anti-suppression；演示路径为 Gabor → 红蓝天平 → 灯光跳跳。
 
 ## 4. 全局代码质量约定
 
 - 视觉算法写成独立纯函数，附带 JSDoc / TypeScript 类型
 - Canvas 使用 `requestAnimationFrame`
 - 儿童端按钮最小点击区域 \(48 \times 48\text{px}\)，配备音效反馈
+- 新游戏必须接入 `useTrainingSession`，勿另起计时；眼镜关设置 `needsGlasses: true`

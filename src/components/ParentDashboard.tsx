@@ -51,6 +51,41 @@ function bciSentence(bci: number | undefined): string {
   return `今天弱视眼参与偏少（BCI ${bci}），请确认眼镜与校准。`
 }
 
+function clinicalCell(s: TrainingSession): string {
+  const c = s.clinical
+  if (!c) return '—'
+  if (c.finalDisparityPx != null) return `视差 ${Math.round(c.finalDisparityPx)}px`
+  if (c.meanSaccadeRtMs != null) return `扫视 ${c.meanSaccadeRtMs}ms`
+  if (c.fellowContrast != null) {
+    return `天平 ${Math.round(c.fellowContrast * 100)}%`
+  }
+  if (c.finalContrast != null) return `C ${c.finalContrast.toFixed(3)}`
+  if (c.bci != null) return `BCI ${c.bci}`
+  return '—'
+}
+
+function clinicalKidNote(sessions: TrainingSession[]): string {
+  const latest = [...sessions].reverse().find((s) => s.clinical)
+  const c = latest?.clinical
+  if (!c) return '练完新关卡后，这里会多一句立体视 / 扫视 / 天平的小结。'
+  if (c.finalDisparityPx != null) {
+    return c.finalDisparityPx <= 16
+      ? `立体视练到很细（视差约 ${Math.round(c.finalDisparityPx)}px），深度分辨不错。`
+      : `立体视还在爬坡（视差约 ${Math.round(c.finalDisparityPx)}px），戴稳眼镜多练「谁更近」。`
+  }
+  if (c.meanSaccadeRtMs != null) {
+    return c.meanSaccadeRtMs <= 700
+      ? `扫视反应约 ${c.meanSaccadeRtMs}ms，跳得又快又准。`
+      : `扫视平均 ${c.meanSaccadeRtMs}ms，可多练「灯光跳跳」练眼跳。`
+  }
+  if (c.fellowContrast != null) {
+    return c.fellowContrast <= 0.55
+      ? `红蓝天平已把健眼对比压到约 ${Math.round(c.fellowContrast * 100)}%，抗抑制挑战不错。`
+      : `天平健眼对比约 ${Math.round(c.fellowContrast * 100)}%，继续让弱视眼多找宝藏。`
+  }
+  return bciSentence(c.bci)
+}
+
 /**
  * Parent trends / export. When `embedded`, PIN is handled by ParentShell.
  */
@@ -160,6 +195,9 @@ export function ParentDashboard({ embedded = false }: { embedded?: boolean }) {
       </p>
       <p className="mb-4 rounded-2xl bg-sky-50 px-4 py-3 text-base font-bold text-sky-900 ring-1 ring-sky-200">
         {bciSentence(latestBci)}
+      </p>
+      <p className="mb-4 rounded-2xl bg-violet-50 px-4 py-3 text-base font-bold text-violet-900 ring-1 ring-violet-200">
+        {clinicalKidNote(sessions)}
       </p>
       <p className="mb-4 text-base font-bold text-slate-600">
         今日墙钟 {formatMmSs(liveWall)} · 有效专注 {formatMmSs(liveEff)}
@@ -393,11 +431,7 @@ export function ParentDashboard({ embedded = false }: { embedded?: boolean }) {
                         : '—'}
                     </td>
                     <td className="px-4 py-3 text-violet-700">
-                      {s.clinical?.finalContrast != null
-                        ? `C ${s.clinical.finalContrast.toFixed(3)}`
-                        : s.clinical?.bci != null
-                          ? `BCI ${s.clinical.bci}`
-                          : '—'}
+                      {clinicalCell(s)}
                     </td>
                     <td className="px-4 py-3 font-bold">{s.score}</td>
                   </tr>

@@ -235,13 +235,34 @@ export function GaborGame() {
         playTone('success')
         if (atX != null && atY != null) {
           particlesRef.current.push(...spawnConfetti(atX, atY))
+          particlesRef.current.push(
+            ...Array.from({ length: 10 }, (_, i) => {
+              const a = (i / 10) * Math.PI * 2
+              return {
+                x: atX,
+                y: atY,
+                vx: Math.cos(a) * 3.2,
+                vy: Math.sin(a) * 3.2,
+                life: 0.45,
+                color: 'rgba(255,255,255,0.85)',
+                size: 5,
+              }
+            }),
+          )
         }
-        setScore((s) => ({
-          hits: s.hits + 1,
-          misses: s.misses,
-          streak: s.streak + 1,
-        }))
-        syncHud('太棒了！✨')
+        setScore((s) => {
+          const streak = s.streak + 1
+          return {
+            hits: s.hits + 1,
+            misses: s.misses,
+            streak,
+          }
+        })
+        syncHud(
+          adjusted !== 'none'
+            ? '更难一点点啦，眼睛真棒！'
+            : '太棒了！✨',
+        )
       } else {
         playTone('error')
         setScore((s) => ({
@@ -477,6 +498,7 @@ export function GaborGame() {
             trialCount: 0,
           })
           setRunning(true)
+          syncHud('先找找有条纹的小斑点～点到它！')
           playTone('tick')
         }}
         onEnd={() => {
@@ -491,7 +513,12 @@ export function GaborGame() {
             trialCount: trialCountRef.current,
           })
           void end({ save: true })
-          syncHud('已结束并保存记录。点开始再练～')
+          const c = Math.round(s.contrast * 100)
+          syncHud(
+            c < 45
+              ? `今天找得很细心！最难时对比度约 ${c}%～`
+              : `练完啦！今天最难对比度约 ${c}%，明天还能更棒`,
+          )
         }}
       />
     </GameShell>
