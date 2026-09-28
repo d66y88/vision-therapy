@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTrainingSession } from '../../hooks/useTrainingSession'
+import {
+  bubbleSpawnGapForLevel,
+  bubbleTtlForLevel,
+  getGameAbility,
+} from '../../lib/abilityProfile'
 import { playTone } from '../../lib/audio'
 import { fitCanvasToParent } from '../../lib/fitCanvas'
 import { fillSquareGrating } from '../../lib/grating'
@@ -232,10 +237,11 @@ export function BubbleRushGame() {
             setMessage('今日训练时间已用完')
             return
           }
+          const ability = getGameAbility('bubbleRush')
           bubblesRef.current = []
           popsRef.current = []
-          spawnGapRef.current = 800
-          ttlBaseRef.current = 2400
+          spawnGapRef.current = bubbleSpawnGapForLevel(ability.level)
+          ttlBaseRef.current = bubbleTtlForLevel(ability.level)
           setScore({ hits: 0, misses: 0 })
           spawnAtRef.current = 0
           setMessage('盯住中间十字，四周冒泡就点破')

@@ -3,6 +3,7 @@ import { ColorCalibration } from './components/ColorCalibration'
 import { DistanceGuard } from './components/DistanceGuard'
 import { GamePlayer } from './components/GamePlayer'
 import { HomeHub } from './components/HomeHub'
+import { InstallHint } from './components/InstallHint'
 import { ParentShell } from './components/ParentShell'
 import {
   hasPassedSuppressionIntro,
@@ -24,14 +25,16 @@ import {
   setPlaylistAdvanceHandler,
   suppressNextPlaylistAdvance,
 } from './lib/playlistProgress'
+import { requestSync } from './lib/sync/engine'
 import { useColorConfigStore } from './store/colorConfigStore'
+import { useSyncStore } from './store/syncStore'
 import { useTrainingTimerStore } from './store/trainingTimerStore'
 
 type Shell = 'kid' | 'parent'
 type KidView = 'home' | 'play' | 'intro' | 'calibration'
 
-/** Clinic demo: acuity + dichoptic balance + saccades. */
-const DEMO_GAMES: GameId[] = ['gabor', 'contrastBalance', 'saccadeJump']
+/** Clinic demo: acuity + dichoptic balance + vergence. */
+const DEMO_GAMES: GameId[] = ['gabor', 'contrastBalance', 'vergenceJump']
 
 function App() {
   const [shell, setShell] = useState<Shell>('kid')
@@ -58,7 +61,8 @@ function App() {
       activeGame === 'orient' ||
       activeGame === 'fixate' ||
       activeGame === 'bubbleRush' ||
-      activeGame === 'saccadeJump')
+      activeGame === 'saccadeJump' ||
+      activeGame === 'vergenceJump')
 
   const launchGame = useCallback(
     (id: GameId, opts?: { skipRitual?: boolean }) => {
@@ -153,6 +157,17 @@ function App() {
     })
     return () => setPlaylistAdvanceHandler(null)
   }, [advanceAfterGame])
+
+  // Bootstrap cloud sync (no-op when unconfigured) + flush on tab hide.
+  useEffect(() => {
+    void useSyncStore.getState().init()
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') requestSync('hidden')
+    }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('online', () => requestSync('online'))
+    return () => document.removeEventListener('visibilitychange', onHide)
+  }, [])
 
   // Dose bar must only advance during an active game session — never on home,
   // rituals, calibration, intro, or parent shell.
@@ -332,8 +347,10 @@ function App() {
       />
 
       <footer className="border-t border-sky-100/80 px-4 py-3 text-center text-sm text-slate-500 sm:px-6">
-        辅助训练，不能替代专业诊疗。数据仅存本机。
+        辅助训练，不能替代专业诊疗。数据本地保存，可选云同步。
       </footer>
+
+      <InstallHint />
     </div>
   )
 }

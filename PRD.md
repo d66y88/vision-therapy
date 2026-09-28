@@ -8,7 +8,7 @@
 
 **技术选型：**
 - 前端框架：React + Tailwind CSS
-- 图形渲染：HTML5 Canvas API / Three.js (WebGL)
+- 图形渲染：HTML5 Canvas API（本阶段不引入 Three.js）
 - 状态管理：Zustand
 - 数据持久化：IndexedDB 或 LocalStorage
 - 部署形式：Web SPA（兼容 iPad / Mac / PC，可基于 Capacitor 打包）
@@ -61,9 +61,9 @@
 
 ### 模块四：防疲劳与距离监测 (Distance & Fatigue Guard)
 
-**防疲劳：** 单次训练硬性限制 15 分钟；到达后自动暂停，进入 3 分钟眼保健操/远眺提示，禁止继续交互。
+**防疲劳：** 墙钟上限默认 **30 分钟**（家长可调 30/45/60）；有效专注目标默认约 **18 分钟**。**有效时间按真实在任时长计**（专注不缩短应练时长，分心打折）。训练中每约 **12 分钟**一次 20 秒远眺微休息；到达墙钟上限后自动锁定并进入 3 分钟休息，禁止继续交互。
 
-**距离监测（选配）：** WebCam + face-landmarks / MediaPipe；瞳距像素估算距离；若距屏 \(< 40\text{cm}\)，全屏弹窗阻塞。
+**距离监测（选配）：** WebCam 简易人脸框估算距离；若距屏过近，全屏弹窗阻塞。MediaPipe 等进阶方案本阶段不引入。
 
 ## 3. 实施路线图
 
@@ -71,7 +71,13 @@
 2. **阶段二：** GaborGame Canvas + 阶梯自适应
 3. **阶段三：** DichopticGame 红蓝分视游戏
 4. **阶段四：** TrainingTimer + ParentDashboard + IndexedDB
-5. **阶段五（已落地）：** 游戏库扩至 11 关；新增扫视 `saccadeJump`、立体视 `stereoNear`、对比度平衡抗抑制 `contrastBalance`；核心关画面/玩法/交互抛光；课表仍 4–6 关且 ≥1 acuity + ≥1 anti-suppression；演示路径为 Gabor → 红蓝天平 → 灯光跳跳。
+5. **阶段五（已落地）：** 游戏库扩至 11 关；新增扫视 `saccadeJump`、立体视 `stereoNear`、对比度平衡抗抑制 `contrastBalance`；核心关画面/玩法/交互抛光；课表仍 4–6 关且 ≥1 acuity + ≥1 anti-suppression。
+6. **阶段六（已落地）：** 游戏库扩至 **12** 关；弱关（fixate / bubble / memory / starPop / dichoptic）开局吃 ability；首页课表与打卡双进度；全局弱视眼偏好；新增近远集合散 `vergenceJump`（`focus: vergence`）；演示路径为 Gabor → 红蓝天平 → 近远跳跳。
+7. **阶段七（已落地）：** 不加新关，做深体验——ability 难度级别在孩子/家长端可见（入门/进阶/挑战 + 升级庆祝 + 家长各关最佳）；里程碑贴纸激励（连续 3/7/14/30 天，`rewardsStore`）；全局音效开关（`settingsStore`，`playTone` 读取）；首页短名 + focus 图标、自由加练排除课表关。
+8. **阶段八（已落地）：** 剂量科学化——修正「有效分钟」语义（`accrualMultiplier` 封顶 1.0，专注不再加速打卡时钟、仅惩罚分心）；家长区新增周剂量视图（本周在任分钟 / 周目标、训练天数、双眼类占比，`doseSummary`）；墙钟上限家长可调 30/45/60 逼近循证剂量（约 5–7.5 h/周）；训练中每约 12 分钟 20 秒远眺微休息。以上为产品/循证设计，非医疗处方，遮盖与配镜等遵医嘱。
+9. **阶段九（本轮）：** 云同步与 iPad PWA——
+   - **PWA 可安装 / 离线**：`vite-plugin-pwa`（Workbox `generateSW`，`autoUpdate`）+ manifest + 多尺寸图标（含 iOS `apple-touch-icon` 与 maskable）+ iOS 全屏 meta；`navigator.storage.persist()` 申请持久化存储，规避 iOS ~7 天 ITP 清存储；`InstallHint` 在 iOS Safari 未安装时引导「添加到主屏幕」。**iPad 无需二次打包**，Safari「添加到主屏幕」即得全屏离线应用。
+   - **可选云同步（Supabase + 匿名登录 + 同步码）**：本地优先，未配置环境变量时为「仅本地」模式（`supabaseClient` env 守卫，`getSupabase()` 返回 `null`）。会话按 `syncId`(UUID) 去重、append-only 合并；白名单配置 KV（进度/连胜/贴纸/设置等）按 `updated_at` 后写覆盖；多设备通过 6 位同步码加入同一「家庭」（`create_family` / `create_sync_code` / `redeem_sync_code` RPC）。数据按家庭 RLS 隔离、匿名保存、**不收集孩子姓名等 PII**。触发点：启动、结束会话、切后台（`visibilitychange`）、恢复在线（`online`）。建表见 `supabase/schema.sql`，环境变量见 `.env.example`。
 
 ## 4. 全局代码质量约定
 

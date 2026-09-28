@@ -9,9 +9,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { loadAbilityProfile } from '../lib/abilityProfile'
-import { focusSentence } from '../lib/focusScore'
-import { gameTitle } from '../lib/gameCatalog'
+import { levelLabel, levelTone, loadAbilityProfile } from '../lib/abilityProfile'
+import {
+  BINOCULAR_SHARE_TARGET_PCT,
+  computeWeeklyDose,
+  WEEKLY_TRAINING_DAYS_TARGET,
+} from '../lib/doseSummary'
+import { focusSentence, getETargetMs } from '../lib/focusScore'
+import { gameTitle, type GameId } from '../lib/gameCatalog'
 import {
   clearParentPin,
   hasParentPin,
@@ -56,6 +61,8 @@ function clinicalCell(s: TrainingSession): string {
   if (!c) return '—'
   if (c.finalDisparityPx != null) return `视差 ${Math.round(c.finalDisparityPx)}px`
   if (c.meanSaccadeRtMs != null) return `扫视 ${c.meanSaccadeRtMs}ms`
+  if (c.meanCatchRtMs != null) return `注视 ${c.meanCatchRtMs}ms`
+  if (c.meanVergenceRtMs != null) return `近远 ${c.meanVergenceRtMs}ms`
   if (c.fellowContrast != null) {
     return `天平 ${Math.round(c.fellowContrast * 100)}%`
   }
@@ -77,6 +84,16 @@ function clinicalKidNote(sessions: TrainingSession[]): string {
     return c.meanSaccadeRtMs <= 700
       ? `扫视反应约 ${c.meanSaccadeRtMs}ms，跳得又快又准。`
       : `扫视平均 ${c.meanSaccadeRtMs}ms，可多练「灯光跳跳」练眼跳。`
+  }
+  if (c.meanCatchRtMs != null) {
+    return c.meanCatchRtMs <= 600
+      ? `注视抓住约 ${c.meanCatchRtMs}ms，停住时很稳。`
+      : `注视反应约 ${c.meanCatchRtMs}ms，可多练「盯住小光点」。`
+  }
+  if (c.meanVergenceRtMs != null) {
+    return c.meanVergenceRtMs <= 800
+      ? `近远跳反应约 ${c.meanVergenceRtMs}ms，集合散节奏不错。`
+      : `近远跳约 ${c.meanVergenceRtMs}ms，可多练「近远跳跳」。`
   }
   if (c.fellowContrast != null) {
     return c.fellowContrast <= 0.55
@@ -152,6 +169,31 @@ export function ParentDashboard({ embedded = false }: { embedded?: boolean }) {
     return undefined
   }, [sessions])
 
+  const weekly = useMemo(
+    () => computeWeeklyDose(sessions, getETargetMs()),
+    [sessions],
+  )
+
+  const perGame = useMemo(() => {
+    const map = new Map<
+      string,
+      { module: string; count: number; bestAcc: number; last: string }
+    >()
+    for (const s of sessions) {
+      const cur =
+        map.get(s.module) ??
+        { module: s.module, count: 0, bestAcc: 0, last: s.startedAt }
+      cur.count += 1
+      cur.bestAcc = Math.max(cur.bestAcc, s.accuracy)
+      if (s.startedAt > cur.last) cur.last = s.startedAt
+      map.set(s.module, cur)
+    }
+    const ability = loadAbilityProfile()
+    return [...map.values()]
+      .map((g) => ({ ...g, level: ability[g.module as GameId]?.level ?? 0 }))
+      .sort((a, b) => b.count - a.count)
+  }, [sessions])
+
   const summary = useMemo(() => {
     if (sessions.length === 0) {
       return { count: 0, avgAcc: 0, avgRt: null as number | null, totalMin: 0 }
@@ -202,7 +244,7 @@ export function ParentDashboard({ embedded = false }: { embedded?: boolean }) {
       <p className="mb-4 text-base font-bold text-slate-600">
         今日墙钟 {formatMmSs(liveWall)} · 有效专注 {formatMmSs(liveEff)}
         <span className="ml-2 text-slate-500">
-          （专心 → 坐的时间更短也能打卡）
+          （有效时间=真实在任时长，分心会打折）
         </span>
       </p>
 
@@ -217,6 +259,74 @@ export function ParentDashboard({ embedded = false }: { embedded?: boolean }) {
         />
         <Stat label="累计时长" value={`${summary.totalMin.toFixed(1)}分`} />
       </div>
+
+      <div className="mb-4 rounded-3xl bg-white/90 p-4 ring-1 ring-sky-100">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-base font-extrabold text-slate-700">本周剂量</p>
+          <p className="text-base font-bold tabular-nums text-sky-700">
+            {weekly.onTaskMin} / {weekly.targetMin} 分钟
+          </p>
+        </div>
+        <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-sky-500 transition-[width] duration-300"
+            style={{
+              width: `${weekly.targetMin > 0 ? Math.min(100, (weekly.onTaskMin / weekly.targetMin) * 100) : 0}%`,
+            }}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold">
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-200">
+            本周训练 {weekly.daysTrained}/{WEEKLY_TRAINING_DAYS_TARGET} 天
+          </span>
+          <span
+            className={`rounded-full px-3 py-1 ring-1 ${
+              weekly.binocularPct >= BINOCULAR_SHARE_TARGET_PCT
+                ? 'bg-indigo-50 text-indigo-700 ring-indigo-200'
+                : 'bg-amber-50 text-amber-700 ring-amber-200'
+            }`}
+          >
+            双眼类占比 {weekly.binocularPct}%
+          </span>
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          循证的双眼数字疗法常见约 5–7.5 小时/周（300–450 分钟）。
+          {weekly.binocularPct < BINOCULAR_SHARE_TARGET_PCT
+            ? ' 本周双眼/抗抑制占比偏低，建议多安排红蓝天平、小熊冒险等双眼关。'
+            : ' 在任时间为真实训练时长，专心不缩短应练时长。'}
+        </p>
+      </div>
+
+      {perGame.length > 0 && (
+        <div className="mb-4 rounded-3xl bg-white/90 p-4 ring-1 ring-sky-100">
+          <p className="mb-3 text-base font-extrabold text-slate-700">
+            各关难度与最佳
+          </p>
+          <div className="grid gap-2">
+            {perGame.map((g) => (
+              <div
+                key={g.module}
+                className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200"
+              >
+                <span className="min-w-0">
+                  <span className="block text-base font-extrabold text-slate-800">
+                    {moduleLabel(g.module as GameId)}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-500">
+                    练 {g.count} 次 · 最佳 {g.bestAcc.toFixed(0)}% · 末次{' '}
+                    {formatShortDate(g.last)}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-sm font-bold ${levelTone(g.level)}`}
+                >
+                  {levelLabel(g.level)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <button

@@ -10,6 +10,7 @@ import { PursuitGame } from './games/PursuitGame'
 import { SaccadeJumpGame } from './games/SaccadeJumpGame'
 import { StarPopGame } from './games/StarPopGame'
 import { StereoNearGame } from './games/StereoNearGame'
+import { VergenceJumpGame } from './games/VergenceJumpGame'
 
 export function GamePlayer({ gameId }: { gameId: GameId }) {
   switch (gameId) {
@@ -35,6 +36,8 @@ export function GamePlayer({ gameId }: { gameId: GameId }) {
       return <StereoNearGame />
     case 'contrastBalance':
       return <ContrastBalanceGame />
+    case 'vergenceJump':
+      return <VergenceJumpGame />
     default:
       return null
   }

@@ -10,7 +10,10 @@ import {
   markPlaylistGameDone,
   notifyPlaylistAdvance,
 } from '../lib/playlistProgress'
-import { markStreakDay, tryMakeupBridge } from '../lib/streakStore'
+import { getCurrentStreak, markStreakDay, tryMakeupBridge } from '../lib/streakStore'
+import { syncRewards } from '../lib/rewardsStore'
+import { getDeviceId } from '../lib/deviceId'
+import { requestSync } from '../lib/sync/engine'
 import { average, saveTrainingSession } from '../lib/trainingDb'
 import type { ClinicalMetrics, TrainingModule } from '../lib/trainingTypes'
 import { computeBci } from '../lib/trainingTypes'
@@ -64,6 +67,7 @@ function tryCheckIn(): void {
   if (getCompletedPlaylistIds().length >= 1) {
     tryMakeupBridge()
   }
+  syncRewards(getCurrentStreak())
 }
 
 /**
@@ -187,6 +191,8 @@ export function useTrainingSession(module: TrainingModule) {
 
       try {
         await saveTrainingSession({
+          syncId: crypto.randomUUID(),
+          deviceId: getDeviceId(),
           module: draft.module,
           startedAt: draft.startedAt,
           endedAt,
@@ -204,6 +210,8 @@ export function useTrainingSession(module: TrainingModule) {
         if (isOnTodaysPlaylist(id)) {
           notifyPlaylistAdvance(id)
         }
+        // Fire-and-forget cloud sync (no-op when not configured).
+        void requestSync('session-end')
       } finally {
         endingRef.current = false
       }

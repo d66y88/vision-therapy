@@ -7,9 +7,14 @@ import {
   useGameShell,
 } from '../GameShell'
 import { useTrainingSession } from '../../hooks/useTrainingSession'
+import {
+  getGameAbility,
+  memoryPairsForLevel,
+} from '../../lib/abilityProfile'
 import { playTone } from '../../lib/audio'
 import { toBlueCss, toRedCss } from '../../lib/colorConfig'
 import { useColorConfigStore } from '../../store/colorConfigStore'
+import { useTherapyProfileStore } from '../../store/therapyProfileStore'
 
 type CardColor = 'red' | 'blue'
 interface Card {
@@ -40,7 +45,8 @@ function buildDeck(pairCount: number): Card[] {
  * Dichoptic memory: match same symbol across red/blue channels.
  */
 export function MemoryMatchGame() {
-  const { begin, end, recordTrial, locked } = useTrainingSession('memory')
+  const { begin, end, recordTrial, setClinical, locked } =
+    useTrainingSession('memory')
   const redCss = toRedCss(useColorConfigStore((s) => s.redR))
   const blueCss = toBlueCss(
     useColorConfigStore((s) => s.blueG),
@@ -55,12 +61,15 @@ export function MemoryMatchGame() {
   const [message, setMessage] = useState(
     '戴眼镜：必须一红一蓝翻开，符号相同才配对（两只眼睛都要看见）',
   )
-  const [pairGoal, setPairGoal] = useState(6)
+  const [pairGoal, setPairGoal] = useState(() =>
+    memoryPairsForLevel(getGameAbility('memory').level),
+  )
 
   const flippedRef = useRef<number[]>([])
   const lockRef = useRef(false)
   const cardsRef = useRef<Card[]>([])
   const endingRef = useRef(false)
+  const countsRef = useRef({ redHits: 0, blueCollisions: 0 })
 
   flippedRef.current = flipped
   lockRef.current = lockBoard
@@ -100,7 +109,14 @@ export function MemoryMatchGame() {
 
     window.setTimeout(() => {
       if (a.symbol === b.symbol && a.channel !== b.channel) {
+        // Successful cross-channel match: both eyes contributed.
+        countsRef.current.redHits += 1
         recordTrial('hit', null, 1)
+        setClinical({
+          redHits: countsRef.current.redHits,
+          blueCollisions: countsRef.current.blueCollisions,
+          woreGlasses: true,
+        })
         playTone('success')
         setCards((prev) => {
           const next = prev.map((c) =>
@@ -119,7 +135,13 @@ export function MemoryMatchGame() {
         setScore((s) => ({ ...s, hits: s.hits + 1 }))
         if (!endingRef.current) setMessage('配对成功！双眼都看见了～')
       } else {
+        countsRef.current.blueCollisions += 1
         recordTrial('miss', null, 0)
+        setClinical({
+          redHits: countsRef.current.redHits,
+          blueCollisions: countsRef.current.blueCollisions,
+          woreGlasses: true,
+        })
         playTone('error')
         setScore((s) => ({ ...s, misses: s.misses + 1 }))
         setMessage(
@@ -153,8 +175,8 @@ export function MemoryMatchGame() {
             return
           }
           endingRef.current = false
-          const pairs = pairGoal
-          const deck = buildDeck(pairs)
+          countsRef.current = { redHits: 0, blueCollisions: 0 }
+          const deck = buildDeck(pairGoal)
           cardsRef.current = deck
           flippedRef.current = []
           lockRef.current = false
@@ -162,6 +184,7 @@ export function MemoryMatchGame() {
           setFlipped([])
           setLockBoard(false)
           setScore({ hits: 0, misses: 0 })
+          setClinical({ redHits: 0, blueCollisions: 0, woreGlasses: true, amblyopicEye: useTherapyProfileStore.getState().amblyopicEye })
           setRunning(true)
           setMessage('记住：一红一蓝 + 同一符号。两只眼睛都要看见！')
           playTone('tick')
@@ -204,8 +227,8 @@ function MemoryBody({
   onFlip: (id: number) => void
   onStart: () => void
   onEnd: () => void
-  pairGoal: number
-  onPairGoal: (n: number) => void
+  pairGoal: 4 | 6 | 8
+  onPairGoal: (n: 4 | 6 | 8) => void
 }) {
   const { isFullscreen } = useGameShell()
   return (
@@ -230,7 +253,7 @@ function MemoryBody({
 
       {!running && (
         <div className="mb-3 flex flex-wrap justify-center gap-2">
-          {[4, 6, 8].map((n) => (
+          {([4, 6, 8] as const).map((n) => (
             <button
               key={n}
               type="button"

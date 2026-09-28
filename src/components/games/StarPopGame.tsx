@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTrainingSession } from '../../hooks/useTrainingSession'
+import {
+  getGameAbility,
+  starPopRedBiasForLevel,
+  starPopSpawnGapForLevel,
+} from '../../lib/abilityProfile'
 import { playTone } from '../../lib/audio'
 import { toBlueCss, toRedCss } from '../../lib/colorConfig'
 import { fillBwVerticalGrating } from '../../lib/grating'
 import { useStageCanvas } from '../../hooks/useStageCanvas'
 import { useColorConfigStore } from '../../store/colorConfigStore'
+import { useTherapyProfileStore } from '../../store/therapyProfileStore'
 import { CanvasStage } from '../CanvasStage'
 import {
   GameControls,
@@ -44,10 +50,12 @@ export function StarPopGame() {
   const redBiasRef = useRef(0.62)
   const spawnGapRef = useRef(1000)
   const waveHitsRef = useRef(0)
+  /** Amblyopic-eye channel = collect; fellow = avoid. */
+  const targetKindRef = useRef<'red' | 'blue'>('red')
   const [running, setRunning] = useState(false)
   const [score, setScore] = useState({ hits: 0, misses: 0 })
   const [wave, setWave] = useState(1)
-  const [message, setMessage] = useState('戴上红蓝眼镜：只戳红星，别戳蓝星')
+  const [message, setMessage] = useState('戴上红蓝眼镜：只戳弱视眼颜色的星')
 
   useEffect(() => {
     if (locked && running) {
@@ -64,12 +72,13 @@ export function StarPopGame() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     syncSize()
+    const targetKind = targetKindRef.current
 
     const loop = (now: number) => {
       const { w, h } = sizeRef.current
       if (now >= spawnAtRef.current) {
         let kind: 'red' | 'blue' =
-          Math.random() < redBiasRef.current ? 'red' : 'blue'
+          Math.random() < redBiasRef.current ? targetKind : targetKind === 'red' ? 'blue' : 'red'
         const recent = lastKindsRef.current
         if (
           recent.length >= 2 &&
@@ -132,13 +141,16 @@ export function StarPopGame() {
         .find((s) => Math.hypot(s.x - x, s.y - y) <= s.r + 10)
       if (!hit) return
       starsRef.current = starsRef.current.filter((s) => s.id !== hit.id)
-      if (hit.kind === 'red') {
+      const targetKind = targetKindRef.current
+      if (hit.kind === targetKind) {
         countsRef.current.redHits += 1
         waveHitsRef.current += 1
         recordTrial('hit', performance.now() - hit.born, 1)
         setClinical({
           redHits: countsRef.current.redHits,
           blueCollisions: countsRef.current.blueCollisions,
+          amblyopicEye: targetKind,
+          woreGlasses: true,
         })
         setScore((s) => {
           const hits = s.hits + 1
@@ -162,12 +174,14 @@ export function StarPopGame() {
         setClinical({
           redHits: countsRef.current.redHits,
           blueCollisions: countsRef.current.blueCollisions,
+          amblyopicEye: targetKind,
+          woreGlasses: true,
         })
         setScore((s) => ({ ...s, misses: s.misses + 1 }))
         spawnGapRef.current = Math.min(1400, spawnGapRef.current + 60)
         redBiasRef.current = Math.min(0.8, redBiasRef.current + 0.03)
         playTone('error')
-        setMessage('慢慢来，蓝星躲开就好～')
+        setMessage('慢慢来，另一只眼睛的星躲开就好～')
       }
     },
     [running, recordTrial, setClinical, canvasRef],
@@ -194,16 +208,24 @@ export function StarPopGame() {
             setMessage('今日训练时间已用完')
             return
           }
+          const ability = getGameAbility('starPop')
+          const eye = useTherapyProfileStore.getState().amblyopicEye
+          targetKindRef.current = eye
           starsRef.current = []
           countsRef.current = { redHits: 0, blueCollisions: 0 }
           lastKindsRef.current = []
-          redBiasRef.current = 0.62
-          spawnGapRef.current = 1000
+          redBiasRef.current = starPopRedBiasForLevel(ability.level)
+          spawnGapRef.current = starPopSpawnGapForLevel(ability.level)
           waveHitsRef.current = 0
           setWave(1)
           setScore({ hits: 0, misses: 0 })
           spawnAtRef.current = 0
-          setMessage('第 1 波：只戳红星，收集 8 颗')
+          setClinical({ amblyopicEye: eye, woreGlasses: true })
+          setMessage(
+            eye === 'red'
+              ? '第 1 波：只戳红星（弱视眼），躲开蓝星'
+              : '第 1 波：只戳蓝星（弱视眼），躲开红星',
+          )
           setRunning(true)
           playTone('tick')
           requestAnimationFrame(syncSize)
@@ -250,7 +272,7 @@ function StarBody(props: {
   return (
     <div className={isFullscreen ? 'flex min-h-0 flex-1 flex-col' : 'mx-auto flex w-full max-w-4xl flex-col px-4 py-4 sm:px-6'}>
       <GameHud>
-        <GameHudStat label="红星" value={`${score.hits}`} />
+        <GameHudStat label="收集" value={`${score.hits}`} />
         <GameHudStat label="波次" value={`${wave}`} />
         <GameHudStat label="准确率" value={`${accuracy}%`} />
         {isFullscreen && <p className="ml-auto self-center text-xs font-bold text-white/70">{message}</p>}

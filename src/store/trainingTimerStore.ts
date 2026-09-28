@@ -1,13 +1,12 @@
 import { create } from 'zustand'
 import {
+  accrualMultiplier,
   DEFAULT_E_TARGET_MS,
   getETargetMs,
+  getWallCapMs,
   type FocusTracker,
 } from '../lib/focusScore'
-import {
-  BREAK_DURATION_MS,
-  TRAINING_LIMIT_MS,
-} from '../lib/trainingTypes'
+import { BREAK_DURATION_MS } from '../lib/trainingTypes'
 
 type TimerPhase = 'idle' | 'training' | 'locked'
 
@@ -109,7 +108,7 @@ function hydrate(): Pick<
     if (Date.now() >= saved.breakEndsAt) {
       return {
         phase: 'idle',
-        elapsedMs: TRAINING_LIMIT_MS,
+        elapsedMs: getWallCapMs(),
         effectiveMs,
         focusScore: 1,
         dayKey: today,
@@ -120,7 +119,7 @@ function hydrate(): Pick<
     }
     return {
       phase: 'locked',
-      elapsedMs: TRAINING_LIMIT_MS,
+      elapsedMs: getWallCapMs(),
       effectiveMs,
       focusScore: 1,
       dayKey: today,
@@ -134,7 +133,7 @@ function hydrate(): Pick<
   // is actively running. Rewrite storage if a prior crash left phase=training.
   const idle = {
     phase: 'idle' as const,
-    elapsedMs: Math.min(saved.elapsedMs, TRAINING_LIMIT_MS),
+    elapsedMs: Math.min(saved.elapsedMs, getWallCapMs()),
     effectiveMs,
     focusScore: 1,
     dayKey: today,
@@ -168,16 +167,17 @@ function lockNow(
   dayKey: string
 } {
   const breakEndsAt = Date.now() + BREAK_DURATION_MS
+  const cap = getWallCapMs()
   persist({
     phase: 'locked',
-    elapsedMs: TRAINING_LIMIT_MS,
+    elapsedMs: cap,
     effectiveMs,
     breakEndsAt,
     dayKey,
   })
   return {
     phase: 'locked',
-    elapsedMs: Math.max(elapsedMs, TRAINING_LIMIT_MS),
+    elapsedMs: Math.max(elapsedMs, cap),
     effectiveMs,
     segmentStartedAt: null,
     lastAccrueAt: null,
@@ -231,7 +231,7 @@ function accrualDelta(
   const from = state.lastAccrueAt ?? state.segmentStartedAt
   const wallDelta = Math.max(0, now - from)
   if (wallDelta <= 0) return null
-  const effDelta = wallDelta * state.focusScore
+  const effDelta = wallDelta * accrualMultiplier(state.focusScore)
   return { wallDelta, effDelta, lastAccrueAt: now }
 }
 
@@ -251,7 +251,7 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
     get().tick()
     const latest = get()
     if (latest.phase === 'locked') return false
-    if (latest.elapsedMs >= TRAINING_LIMIT_MS) return false
+    if (latest.elapsedMs >= getWallCapMs()) return false
 
     if (latest.phase === 'training' && latest.segmentStartedAt != null) {
       return true
@@ -289,14 +289,15 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
     }
 
     const now = Date.now()
+    const cap = getWallCapMs()
     const delta = accrualDelta(current, now)
     const elapsedMs = Math.min(
-      TRAINING_LIMIT_MS,
+      cap,
       current.elapsedMs + (delta?.wallDelta ?? 0),
     )
     const effectiveMs = current.effectiveMs + (delta?.effDelta ?? 0)
 
-    if (elapsedMs >= TRAINING_LIMIT_MS) {
+    if (elapsedMs >= cap) {
       set(lockNow(elapsedMs, effectiveMs, current.dayKey))
       return
     }
@@ -324,7 +325,7 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
       if (delta) {
         set({
           elapsedMs: Math.min(
-            TRAINING_LIMIT_MS,
+            getWallCapMs(),
             current.elapsedMs + delta.wallDelta,
           ),
           effectiveMs: current.effectiveMs + delta.effDelta,
@@ -347,9 +348,10 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
     if (state.phase === 'locked') {
       if (state.breakEndsAt != null && now >= state.breakEndsAt) {
         const dayKey = localDayKey(new Date(now))
+        const cap = getWallCapMs()
         set({
           phase: 'idle',
-          elapsedMs: TRAINING_LIMIT_MS,
+          elapsedMs: cap,
           effectiveMs: state.effectiveMs,
           segmentStartedAt: null,
           lastAccrueAt: null,
@@ -358,7 +360,7 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
         })
         persist({
           phase: 'idle',
-          elapsedMs: TRAINING_LIMIT_MS,
+          elapsedMs: cap,
           effectiveMs: state.effectiveMs,
           breakEndsAt: null,
           dayKey,
@@ -369,9 +371,10 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
     }
 
     if (state.phase === 'training' && state.segmentStartedAt != null) {
+      const cap = getWallCapMs()
       const delta = accrualDelta(state, now)
       const elapsedMs = Math.min(
-        TRAINING_LIMIT_MS,
+        cap,
         state.elapsedMs + (delta?.wallDelta ?? 0),
       )
       const effectiveMs = state.effectiveMs + (delta?.effDelta ?? 0)
@@ -382,7 +385,7 @@ export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
           lastAccrueAt: delta.lastAccrueAt,
         })
       }
-      if (elapsedMs >= TRAINING_LIMIT_MS) {
+      if (elapsedMs >= cap) {
         set(lockNow(elapsedMs, effectiveMs, state.dayKey))
         return false
       }
@@ -431,7 +434,7 @@ export function getLiveElapsedMs(
 ): number {
   if (state.phase === 'training' && state.segmentStartedAt != null) {
     const from = state.lastAccrueAt ?? state.segmentStartedAt
-    return Math.min(TRAINING_LIMIT_MS, state.elapsedMs + Math.max(0, now - from))
+    return Math.min(getWallCapMs(), state.elapsedMs + Math.max(0, now - from))
   }
   return state.elapsedMs
 }
@@ -449,7 +452,7 @@ export function getLiveEffectiveMs(
   if (state.phase === 'training' && state.segmentStartedAt != null) {
     const from = state.lastAccrueAt ?? state.segmentStartedAt
     const wallDelta = Math.max(0, now - from)
-    return state.effectiveMs + wallDelta * state.focusScore
+    return state.effectiveMs + wallDelta * accrualMultiplier(state.focusScore)
   }
   return state.effectiveMs
 }

@@ -39,10 +39,18 @@ export interface ClinicalMetrics {
   fellowContrast?: number
   /** ContrastBalance: which channel is treated as amblyopic eye. */
   amblyopicEye?: 'red' | 'blue'
+  /** Fixate: mean catch reaction time while paused (ms). */
+  meanCatchRtMs?: number
+  /** VergenceJump: mean reaction time on near/far targets (ms). */
+  meanVergenceRtMs?: number
 }
 
 export interface TrainingSession {
   id?: number
+  /** Stable cross-device id for cloud sync dedupe (UUID). */
+  syncId?: string
+  /** Originating device id (for provenance / debugging). */
+  deviceId?: string
   module: TrainingModule
   /** ISO timestamp when the session started. */
   startedAt: string
@@ -61,9 +69,14 @@ export interface TrainingSession {
   clinical?: ClinicalMetrics
 }
 
-/** Wall-clock hard cap — keep in sync with focusScore.WALL_HARD_CAP_MS. */
+/** Default wall-clock cap — keep in sync with focusScore.WALL_HARD_CAP_MS.
+ * Runtime cap is parent-configurable via focusScore.getWallCapMs(). */
 export const TRAINING_LIMIT_MS = 30 * 60 * 1000
 export const BREAK_DURATION_MS = 3 * 60 * 1000
+
+/** 20-20-20 micro-break: gentle far-look reminder cadence + duration. */
+export const MICRO_BREAK_INTERVAL_MS = 12 * 60 * 1000
+export const MICRO_BREAK_SECONDS = 20
 
 /**
  * Derive BCI from red/blue dichoptic counts and overall accuracy.

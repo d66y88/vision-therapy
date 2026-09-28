@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTrainingSession } from '../hooks/useTrainingSession'
+import {
+  dichopticObsSpawnMsForLevel,
+  dichopticSpeedForLevel,
+  getGameAbility,
+} from '../lib/abilityProfile'
 import { playTone } from '../lib/audio'
 import { toBlueCss, toRedCss } from '../lib/colorConfig'
 import {
@@ -11,6 +16,7 @@ import {
 import { fitCanvasToParent } from '../lib/fitCanvas'
 import { fillDichopticPlaid } from '../lib/grating'
 import { useColorConfigStore } from '../store/colorConfigStore'
+import { useTherapyProfileStore } from '../store/therapyProfileStore'
 import { CanvasStage } from './CanvasStage'
 import {
   GameControls,
@@ -196,7 +202,10 @@ export function DichopticGame() {
   const dichopticCountsRef = useRef({ redHits: 0, blueCollisions: 0 })
   const hudSyncAtRef = useRef(0)
   const speedMulRef = useRef(1)
+  const obsSpawnMsRef = useRef(SPAWN_OBS_MS)
   const phaseRef = useRef(1)
+  /** Amblyopic channel for coins; fellow for bear/obstacles. */
+  const ambEyeRef = useRef<'red' | 'blue'>('red')
 
   const [running, setRunning] = useState(false)
   const [snap, setSnap] = useState<GameSnapshot>({
@@ -205,13 +214,15 @@ export function DichopticGame() {
     distance: 0,
     goal: COIN_GOAL,
     phase: 1,
-    message: '戴上红蓝眼镜：红=赛道/金币，蓝=小熊/障碍 · 目标收 12 星',
+    message: '戴上红蓝眼镜：弱视眼看金币，另一眼看小熊与障碍 · 目标收 12 星',
   })
 
   runningRef.current = running
 
   const resetWorld = useCallback(() => {
     const { h } = viewRef.current
+    const eye = useTherapyProfileStore.getState().amblyopicEye
+    ambEyeRef.current = eye
     playerRef.current = { x: 80, y: h / 2 - PLAYER_H / 2 }
     coinsRef.current = []
     obstaclesRef.current = []
@@ -230,7 +241,9 @@ export function DichopticGame() {
     lastTsRef.current = 0
     statsRef.current = { score: 0, lives: 3, distance: 0 }
     dichopticCountsRef.current = { redHits: 0, blueCollisions: 0 }
-    speedMulRef.current = 1
+    const ability = getGameAbility('dichoptic')
+    speedMulRef.current = dichopticSpeedForLevel(ability.level)
+    obsSpawnMsRef.current = dichopticObsSpawnMsForLevel(ability.level)
     phaseRef.current = 1
     setSnap({
       score: 0,
@@ -238,7 +251,10 @@ export function DichopticGame() {
       distance: 0,
       goal: COIN_GOAL,
       phase: 1,
-      message: '方向键或上下滑动：收集 12 颗红星，躲开蓝障碍！',
+      message:
+        eye === 'red'
+          ? '红=金币（弱视眼），蓝=小熊/障碍 · 收 12 星'
+          : '蓝=金币（弱视眼），红=小熊/障碍 · 收 12 星',
     })
   }, [])
 
@@ -352,7 +368,7 @@ export function DichopticGame() {
           w: 36 + Math.random() * 24,
           h: oh,
         })
-        spawnObsAtRef.current = SPAWN_OBS_MS * (0.75 + Math.random() * 0.5)
+        spawnObsAtRef.current = obsSpawnMsRef.current * (0.75 + Math.random() * 0.5)
       }
 
       for (const c of coinsRef.current) c.x -= scroll
@@ -404,6 +420,8 @@ export function DichopticGame() {
         setClinical({
           redHits: dichopticCountsRef.current.redHits,
           blueCollisions: dichopticCountsRef.current.blueCollisions,
+          amblyopicEye: ambEyeRef.current,
+          woreGlasses: true,
         })
         if (statsRef.current.score >= COIN_GOAL * phaseRef.current) {
           phaseRef.current += 1
@@ -411,7 +429,7 @@ export function DichopticGame() {
           hudMessage = `进入第 ${phaseRef.current} 段！速度更快一点点～`
         } else {
           const left = COIN_GOAL * phaseRef.current - statsRef.current.score
-          hudMessage = `收集到红星！本段再收 ${left} 颗`
+          hudMessage = `收集到金币！本段再收 ${left} 颗`
         }
       }
 
@@ -424,6 +442,8 @@ export function DichopticGame() {
         setClinical({
           redHits: dichopticCountsRef.current.redHits,
           blueCollisions: dichopticCountsRef.current.blueCollisions,
+          amblyopicEye: ambEyeRef.current,
+          woreGlasses: true,
         })
         if (statsRef.current.lives === 0) {
           hudMessage = '训练结束啦，再来一局吧！'
@@ -433,7 +453,7 @@ export function DichopticGame() {
             void end({ save: true })
           })
         } else {
-          hudMessage = '蓝障碍撞到啦（另一只眼也要看）· 短暂无敌'
+          hudMessage = '障碍撞到啦（另一只眼也要看）· 短暂无敌'
         }
         setSnap({
           score: statsRef.current.score,
@@ -463,16 +483,18 @@ export function DichopticGame() {
       }
 
       // --- Draw ---
-      // Slow-drifting red/blue plaid grating (clinical-style binocular stimulation).
+      const amb = ambEyeRef.current
+      const coinCss = amb === 'red' ? redCss : blueCss
+      const fellowCss = amb === 'red' ? blueCss : redCss
+
       const gratingPhase = (ts * 0.018) % 200
       fillDichopticPlaid(ctx, w, h, redCss, blueCss, 30, gratingPhase)
 
-      // Soft dark veil so sprites stay readable
       ctx.fillStyle = 'rgba(5,7,12,0.28)'
       ctx.fillRect(FRAME, FRAME, w - FRAME * 2, h - FRAME * 2)
 
-      // Red channel: subtle lane rails + track dashes + coins
-      ctx.strokeStyle = redCss
+      // Amblyopic channel: lane rails + track + coins
+      ctx.strokeStyle = coinCss
       ctx.globalAlpha = 0.7
       ctx.lineWidth = 3
       ctx.beginPath()
@@ -483,7 +505,7 @@ export function DichopticGame() {
       ctx.stroke()
       ctx.globalAlpha = 1
 
-      ctx.fillStyle = redCss
+      ctx.fillStyle = coinCss
       for (const mark of tracksRef.current) {
         ctx.globalAlpha = 0.85
         ctx.fillRect(mark.x, mark.y, mark.w, 4)
@@ -491,18 +513,18 @@ export function DichopticGame() {
       ctx.globalAlpha = 1
 
       for (const c of coinsRef.current) {
-        drawCoin(ctx, c, redCss)
+        drawCoin(ctx, c, coinCss)
       }
 
-      // Blue channel: obstacles + player
+      // Fellow channel: obstacles + player
       for (const o of obstaclesRef.current) {
-        drawObstacle(ctx, o, blueCss)
+        drawObstacle(ctx, o, fellowCss)
       }
 
       const blink =
         ts < invulnUntilRef.current ? Math.floor(ts / 100) % 2 === 0 : true
       if (blink) {
-        drawBear(ctx, playerRef.current.x, playerRef.current.y, blueCss)
+        drawBear(ctx, playerRef.current.x, playerRef.current.y, fellowCss)
       }
 
       drawFusionFrame(ctx, w, h)
@@ -636,22 +658,22 @@ function DichopticBody({
               小熊双眼大冒险
             </h1>
             <p className="mt-2 max-w-2xl text-base text-slate-600">
-              戴上红蓝眼镜：红镜看赛道与金币，蓝镜看小熊与障碍。四周黑白格与中央十字双眼都能看见，帮助融像对焦。
+              戴上红蓝眼镜：弱视眼通道看赛道与金币，另一眼看小熊与障碍。四周黑白格与中央十字双眼都能看见。
             </p>
           </header>
           <div className="mb-3 flex flex-wrap gap-2 text-xs font-bold">
             <span className="rounded-full px-3 py-1 text-white" style={{ background: redCss }}>
-              红通道 · 赛道/金币
+              红通道
             </span>
             <span className="rounded-full px-3 py-1 text-white" style={{ background: blueCss }}>
-              蓝通道 · 角色/障碍
+              蓝通道
             </span>
           </div>
         </>
       )}
 
       <GameHud>
-        <GameHudStat label="红星" value={`${snap.score}/${snap.goal}`} />
+        <GameHudStat label="金币" value={`${snap.score}/${snap.goal}`} />
         <GameHudStat label="生命" value={`${snap.lives}`} />
         <GameHudStat label="阶段" value={`${snap.phase}`} />
         {isFullscreen && (

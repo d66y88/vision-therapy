@@ -15,6 +15,27 @@ const E_TARGET_KEY = 'vision_e_target_ms'
 export const ALLOWED_E_TARGETS_MIN = [15, 18, 20, 25] as const
 const ALLOWED_TARGETS = ALLOWED_E_TARGETS_MIN.map((m) => m * 60 * 1000)
 
+const WALL_CAP_KEY = 'vision_wall_cap_ms'
+/** Parent-selectable daily wall-clock caps (minutes). Default 30. */
+export const ALLOWED_WALL_CAPS_MIN = [30, 45, 60] as const
+const ALLOWED_WALL_CAPS = ALLOWED_WALL_CAPS_MIN.map((m) => m * 60 * 1000)
+
+/** Current daily wall-clock hard cap (parent-configurable, default 30 min). */
+export function getWallCapMs(): number {
+  try {
+    const raw = Number(localStorage.getItem(WALL_CAP_KEY))
+    if (ALLOWED_WALL_CAPS.includes(raw)) return raw
+  } catch {
+    /* ignore */
+  }
+  return WALL_HARD_CAP_MS
+}
+
+export function setWallCapMs(ms: number): void {
+  const next = ALLOWED_WALL_CAPS.includes(ms) ? ms : WALL_HARD_CAP_MS
+  localStorage.setItem(WALL_CAP_KEY, String(next))
+}
+
 export function getETargetMs(): number {
   try {
     const raw = Number(localStorage.getItem(E_TARGET_KEY))
@@ -32,6 +53,16 @@ export function setETargetMs(ms: number): void {
 
 export function clampFocusScore(n: number): number {
   return Math.min(FOCUS_SCORE_MAX, Math.max(FOCUS_SCORE_MIN, n))
+}
+
+/**
+ * Multiplier applied to wall time when accruing effective (check-in) minutes.
+ * Capped at 1.0 so focus can only DISCOUNT (distraction), never inflate the
+ * therapeutic clock beyond real on-task time — dosing science measures actual
+ * time on task. focusScore's >1 range is kept purely for the quality metric.
+ */
+export function accrualMultiplier(focusScore: number): number {
+  return Math.min(1, focusScore)
 }
 
 /** Shared posture signal from DistanceGuard → FocusTracker. */
@@ -125,7 +156,7 @@ export function kidDoseMessage(opts: {
   if (eOk && !playlistDone) return '时间够了，把课表练完就能打卡'
   if (!eOk && playlistDone) return '课表完成啦，再专心练一会儿'
   if (wallExhausted) return '今日训练已满，明天再来'
-  return '专心练 · 还能早点打卡'
+  return '专心练 · 分心会拖慢有效时间'
 }
 
 export function focusSentence(focusAvg: number | undefined): string {
@@ -133,10 +164,10 @@ export function focusSentence(focusAvg: number | undefined): string {
     return '练完几关后，这里会显示今天的专心程度。'
   }
   if (focusAvg >= 75) {
-    return `今天练得很专心（专注 ${focusAvg}），坐姿时间可以更短也能打卡。`
+    return `今天练得很专心（专注 ${focusAvg}），训练质量高，有效时间没打折。`
   }
   if (focusAvg >= 50) {
     return `今天专注还不错（专注 ${focusAvg}），继续保持均匀点击。`
   }
-  return `今天有点分心（专注 ${focusAvg}），多互动、坐远一点，有效时间会攒得更快。`
+  return `今天有点分心（专注 ${focusAvg}），分心会拖慢有效时间，多互动、坐远一点。`
 }

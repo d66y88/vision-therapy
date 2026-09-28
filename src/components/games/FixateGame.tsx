@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTrainingSession } from '../../hooks/useTrainingSession'
+import {
+  fixatePauseMsForLevel,
+  fixateSpeedForLevel,
+  getGameAbility,
+} from '../../lib/abilityProfile'
 import { playTone } from '../../lib/audio'
 import { fillBwVerticalGrating } from '../../lib/grating'
 import { useStageCanvas } from '../../hooks/useStageCanvas'
@@ -13,21 +18,41 @@ import {
 } from '../GameShell'
 
 export function FixateGame() {
-  const { begin, end, recordTrial, locked } = useTrainingSession('fixate')
+  const { begin, end, recordTrial, setClinical, locked } =
+    useTrainingSession('fixate')
   const { canvasRef, sizeRef, syncSize } = useStageCanvas()
-  const targetRef = useRef({ x: 200, y: 200, paused: false, pauseUntil: 0 })
+  const targetRef = useRef({
+    x: 200,
+    y: 200,
+    paused: false,
+    pauseUntil: 0,
+    pauseStarted: 0,
+  })
   const rafRef = useRef(0)
   const nextPauseRef = useRef(0)
+  const pauseMsRef = useRef(1400)
+  const speedRef = useRef(55)
+  const catchRtsRef = useRef<number[]>([])
+
   const [running, setRunning] = useState(false)
   const [score, setScore] = useState({ hits: 0, misses: 0 })
-  const [message, setMessage] = useState('光点停下发亮时，马上点中它')
+  const [message, setMessage] = useState('光点停下发亮时，马上点中它（练注视稳定）')
+
+  const pushClinical = () => {
+    const list = catchRtsRef.current
+    if (list.length === 0) return
+    const mean = Math.round(list.reduce((a, b) => a + b, 0) / list.length)
+    setClinical({ meanCatchRtMs: mean })
+  }
 
   useEffect(() => {
     if (locked && running) {
       setRunning(false)
+      pushClinical()
       void end({ save: true })
       setMessage('今日训练时间到，先休息～')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locked, running, end])
 
   useEffect(() => {
@@ -38,11 +63,19 @@ export function FixateGame() {
     if (!ctx) return
     syncSize()
     const { w, h } = sizeRef.current
-    targetRef.current = { x: w / 2, y: h / 2, paused: false, pauseUntil: 0 }
+    targetRef.current = {
+      x: w / 2,
+      y: h / 2,
+      paused: false,
+      pauseUntil: 0,
+      pauseStarted: 0,
+    }
     nextPauseRef.current = performance.now() + 1800
 
     let angle = Math.random() * Math.PI * 2
     let last = performance.now()
+    const pauseMs = pauseMsRef.current
+    const speed = speedRef.current
 
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
@@ -52,7 +85,8 @@ export function FixateGame() {
 
       if (!t.paused && now >= nextPauseRef.current) {
         t.paused = true
-        t.pauseUntil = now + 1400
+        t.pauseStarted = now
+        t.pauseUntil = now + pauseMs
         playTone('tick')
       }
       if (t.paused && now >= t.pauseUntil) {
@@ -65,7 +99,6 @@ export function FixateGame() {
       }
 
       if (!t.paused) {
-        const speed = 55
         t.x += Math.cos(angle) * speed * dt
         t.y += Math.sin(angle) * speed * dt
         if (t.x < 40 || t.x > cw - 40) angle = Math.PI - angle
@@ -92,7 +125,7 @@ export function FixateGame() {
       ctx.fill()
       if (t.paused) {
         const left = Math.max(0, t.pauseUntil - now)
-        const frac = left / 1400
+        const frac = left / pauseMs
         ctx.beginPath()
         ctx.arc(t.x, t.y, 32, 0, Math.PI * 2)
         ctx.strokeStyle = 'rgba(255,255,255,0.25)'
@@ -125,10 +158,13 @@ export function FixateGame() {
     }
     const hit = Math.hypot(t.x - x, t.y - y) <= 28
     if (hit) {
-      recordTrial('hit', null, 1)
+      const rt = performance.now() - t.pauseStarted
+      catchRtsRef.current.push(rt)
+      recordTrial('hit', rt, 1)
+      pushClinical()
       playTone('success')
       setScore((s) => ({ ...s, hits: s.hits + 1 }))
-      setMessage('抓住啦！')
+      setMessage('抓住啦！注视很稳～')
       t.paused = false
       nextPauseRef.current = performance.now() + 1400 + Math.random() * 1400
     } else {
@@ -159,14 +195,19 @@ export function FixateGame() {
             setMessage('今日训练时间已用完')
             return
           }
+          const ability = getGameAbility('fixate')
+          pauseMsRef.current = fixatePauseMsForLevel(ability.level)
+          speedRef.current = fixateSpeedForLevel(ability.level)
+          catchRtsRef.current = []
           setScore({ hits: 0, misses: 0 })
-          setMessage('光点停下并亮起倒计时环时，马上点中')
+          setMessage('光点停下并亮起倒计时环时，马上点中（注视稳定）')
           setRunning(true)
           playTone('tick')
           requestAnimationFrame(syncSize)
         }}
         onEnd={() => {
           setRunning(false)
+          pushClinical()
           void end({ save: true })
           setMessage(
             accuracy >= 70
@@ -191,16 +232,31 @@ function FixateBody(props: {
   onEnd: () => void
 }) {
   const { isFullscreen } = useGameShell()
-  const { canvasRef, running, score, accuracy, message, onResize, onTap, onStart, onEnd } = props
+  const { canvasRef, running, score, accuracy, message, onResize, onTap, onStart, onEnd } =
+    props
   return (
-    <div className={isFullscreen ? 'flex min-h-0 flex-1 flex-col' : 'mx-auto flex w-full max-w-4xl flex-col px-4 py-4 sm:px-6'}>
+    <div
+      className={
+        isFullscreen
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'mx-auto flex w-full max-w-4xl flex-col px-4 py-4 sm:px-6'
+      }
+    >
       <GameHud>
         <GameHudStat label="抓住" value={`${score.hits}`} />
         <GameHudStat label="失误" value={`${score.misses}`} />
         <GameHudStat label="准确率" value={`${accuracy}%`} />
-        {isFullscreen && <p className="ml-auto self-center text-xs font-bold text-white/70">{message}</p>}
+        {isFullscreen && (
+          <p className="ml-auto self-center text-xs font-bold text-white/70">
+            {message}
+          </p>
+        )}
       </GameHud>
-      {!isFullscreen && <p className="mb-2 text-center text-sm font-extrabold text-slate-700">{message}</p>}
+      {!isFullscreen && (
+        <p className="mb-2 text-center text-sm font-extrabold text-slate-700">
+          {message}
+        </p>
+      )}
       <CanvasStage className="bg-slate-900" onResize={onResize}>
         <canvas
           ref={canvasRef}
@@ -213,9 +269,25 @@ function FixateBody(props: {
       </CanvasStage>
       <GameControls>
         {!running ? (
-          <button type="button" className="min-h-12 rounded-2xl bg-amber-500 px-6 py-3 font-extrabold text-white" onClick={onStart}>开始训练</button>
+          <button
+            type="button"
+            className="min-h-14 rounded-2xl bg-amber-500 px-6 py-3 text-lg font-extrabold text-white"
+            onClick={onStart}
+          >
+            开始训练
+          </button>
         ) : (
-          <button type="button" className={isFullscreen ? 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-900' : 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-700 ring-1 ring-slate-200'} onClick={onEnd}>结束并保存</button>
+          <button
+            type="button"
+            className={
+              isFullscreen
+                ? 'min-h-12 rounded-2xl bg-white px-6 py-3 font-extrabold text-slate-900'
+                : 'min-h-14 rounded-2xl bg-white px-6 py-3 text-lg font-extrabold text-slate-700 ring-1 ring-slate-200'
+            }
+            onClick={onEnd}
+          >
+            结束并保存
+          </button>
         )}
       </GameControls>
     </div>

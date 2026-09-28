@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { getETargetMs, kidDoseMessage } from '../lib/focusScore'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { getETargetMs, getWallCapMs, kidDoseMessage } from '../lib/focusScore'
 import { isPlaylistComplete } from '../lib/playlistProgress'
 import {
   BREAK_DURATION_MS,
-  TRAINING_LIMIT_MS,
+  MICRO_BREAK_INTERVAL_MS,
+  MICRO_BREAK_SECONDS,
 } from '../lib/trainingTypes'
 import {
   formatMmSs,
@@ -36,6 +37,7 @@ export function TrainingTimer() {
 
   const [pulse, setPulse] = useState(0)
   const eTarget = useMemo(() => getETargetMs(), [pulse])
+  const wallCap = useMemo(() => getWallCapMs(), [pulse])
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -49,6 +51,23 @@ export function TrainingTimer() {
     { elapsedMs, phase, segmentStartedAt, lastAccrueAt, focusScore },
     Date.now(),
   )
+
+  // 20-20-20 micro-break: gentle non-blocking far-look reminder each interval.
+  const [microBreakUntil, setMicroBreakUntil] = useState(0)
+  const microBucketRef = useRef(0)
+  const bucket = Math.floor(liveElapsed / MICRO_BREAK_INTERVAL_MS)
+  useEffect(() => {
+    if (bucket < microBucketRef.current) {
+      microBucketRef.current = bucket // new day / reset
+      return
+    }
+    if (phase === 'training' && bucket > microBucketRef.current && bucket >= 1) {
+      microBucketRef.current = bucket
+      setMicroBreakUntil(Date.now() + MICRO_BREAK_SECONDS * 1000)
+    }
+  }, [bucket, phase])
+  const microRemainMs = Math.max(0, microBreakUntil - Date.now())
+  const microActive = microRemainMs > 0
   const liveEffective = getLiveEffectiveMs(
     { effectiveMs, phase, segmentStartedAt, lastAccrueAt, focusScore },
     Date.now(),
@@ -60,7 +79,7 @@ export function TrainingTimer() {
     effectiveMs: liveEffective,
     eTargetMs: eTarget,
     playlistDone,
-    wallExhausted: liveElapsed >= TRAINING_LIMIT_MS && phase !== 'locked',
+    wallExhausted: liveElapsed >= wallCap && phase !== 'locked',
   })
   void pulse
 
@@ -77,7 +96,7 @@ export function TrainingTimer() {
                 ? 'bg-amber-100 text-amber-800'
                 : phase === 'training'
                   ? 'bg-emerald-100 text-emerald-800'
-                  : liveElapsed >= TRAINING_LIMIT_MS
+                  : liveElapsed >= wallCap
                     ? 'bg-slate-200 text-slate-600'
                     : 'bg-sky-100 text-sky-800'
             }`}
@@ -86,7 +105,7 @@ export function TrainingTimer() {
               ? '休息'
               : phase === 'training'
                 ? '训练中'
-                : liveElapsed >= TRAINING_LIMIT_MS
+                : liveElapsed >= wallCap
                   ? '今日已满'
                   : '打卡进度'}
           </span>
@@ -99,6 +118,21 @@ export function TrainingTimer() {
         </div>
       </div>
 
+      {microActive && phase !== 'locked' && (
+        <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-200">
+          <p className="text-base font-extrabold text-teal-800">
+            眼睛歇一下：抬头看看远处 {Math.ceil(microRemainMs / 1000)} 秒～
+          </p>
+          <button
+            type="button"
+            className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-bold text-teal-700 ring-1 ring-teal-200"
+            onClick={() => setMicroBreakUntil(0)}
+          >
+            好了
+          </button>
+        </div>
+      )}
+
       {phase === 'locked' && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-gradient-to-b from-sky-50 to-emerald-50 p-6 text-center shadow-2xl ring-1 ring-white/60">
@@ -106,7 +140,7 @@ export function TrainingTimer() {
               眼睛休息时间
             </h2>
             <p className="mt-3 text-lg text-slate-600">
-              已经练满 {TRAINING_LIMIT_MS / 60000}{' '}
+              已经练满 {wallCap / 60000}{' '}
               分钟啦。请远眺 {BREAK_DURATION_MS / 60000} 分钟。
             </p>
             <p className="mt-6 text-5xl font-black tabular-nums text-amber-600">

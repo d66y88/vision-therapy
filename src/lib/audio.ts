@@ -1,5 +1,7 @@
 /** Tiny Web Audio beeps — no external dependency. */
 
+import { useSettingsStore } from '../store/settingsStore'
+
 let sharedCtx: AudioContext | null = null
 
 function getCtx(): AudioContext | null {
@@ -17,6 +19,7 @@ function getCtx(): AudioContext | null {
  * Play a short success or error tone.
  */
 export function playTone(kind: 'success' | 'error' | 'tick'): void {
+  if (!useSettingsStore.getState().soundOn) return
   const ctx = getCtx()
   if (!ctx) return
 

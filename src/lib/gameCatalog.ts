@@ -12,6 +12,7 @@ export type GameId =
   | 'saccadeJump'
   | 'stereoNear'
   | 'contrastBalance'
+  | 'vergenceJump'
 
 export type GameFocus =
   | 'acuity'
@@ -22,10 +23,13 @@ export type GameFocus =
   | 'memory'
   | 'saccade'
   | 'stereo'
+  | 'vergence'
 
 export interface GameDef {
   id: GameId
   title: string
+  /** Compact 2-char label for kid home chips (avoids slice collisions). */
+  abbr: string
   short: string
   focus: GameFocus
   needsGlasses: boolean
@@ -33,11 +37,38 @@ export interface GameDef {
   minutesHint: string
 }
 
+/** Emoji per training focus — quick visual grouping on kid home chips. */
+export function focusEmoji(focus: GameFocus): string {
+  switch (focus) {
+    case 'acuity':
+      return '🔍'
+    case 'anti-suppression':
+      return '👓'
+    case 'pursuit':
+      return '🦋'
+    case 'fusion':
+      return '🎯'
+    case 'reaction':
+      return '⚡'
+    case 'memory':
+      return '🧠'
+    case 'saccade':
+      return '💡'
+    case 'stereo':
+      return '🧊'
+    case 'vergence':
+      return '🔭'
+    default:
+      return '⭐'
+  }
+}
+
 /** Full pool — hospital apps typically draw 4–6 from a larger library. */
 export const GAME_CATALOG: GameDef[] = [
   {
     id: 'gabor',
     title: 'Gabor 找斑点',
+    abbr: '找斑',
     short: '噪点里找出条纹斑，练空间分辨力',
     focus: 'acuity',
     needsGlasses: false,
@@ -47,6 +78,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'dichoptic',
     title: '红蓝小熊冒险',
+    abbr: '小熊',
     short: '一眼赛道金币，一眼角色障碍',
     focus: 'anti-suppression',
     needsGlasses: true,
@@ -56,6 +88,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'pursuit',
     title: '追蝴蝶',
+    abbr: '追蝶',
     short: '手指跟着飞舞的目标，练追随运动',
     focus: 'pursuit',
     needsGlasses: false,
@@ -65,6 +98,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'starPop',
     title: '戳红星',
+    abbr: '红星',
     short: '只戳红色星星，躲开蓝色干扰（需眼镜）',
     focus: 'anti-suppression',
     needsGlasses: true,
@@ -74,6 +108,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'orient',
     title: '小鱼朝哪边',
+    abbr: '小鱼',
     short: '看清小鱼朝向，点对应方向',
     focus: 'acuity',
     needsGlasses: false,
@@ -83,6 +118,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'memory',
     title: '红蓝翻翻乐',
+    abbr: '翻翻',
     short: '红蓝配对记忆，双眼都要看见',
     focus: 'anti-suppression',
     needsGlasses: true,
@@ -92,6 +128,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'fixate',
     title: '盯住小光点',
+    abbr: '盯点',
     short: '光点停下时立刻点中，练注视稳定',
     focus: 'fusion',
     needsGlasses: false,
@@ -101,6 +138,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'bubbleRush',
     title: '泡泡冲冲冲',
+    abbr: '泡泡',
     short: '四周冒泡泡，又快又准地点破',
     focus: 'reaction',
     needsGlasses: false,
@@ -110,6 +148,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'saccadeJump',
     title: '灯光跳跳',
+    abbr: '跳灯',
     short: '亮灯跳到哪格就点哪格，练眼球扫视',
     focus: 'saccade',
     needsGlasses: false,
@@ -119,6 +158,7 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'stereoNear',
     title: '谁更近',
+    abbr: '谁近',
     short: '戴眼镜看谁更近，练立体深度',
     focus: 'stereo',
     needsGlasses: true,
@@ -128,11 +168,22 @@ export const GAME_CATALOG: GameDef[] = [
   {
     id: 'contrastBalance',
     title: '红蓝天平',
+    abbr: '天平',
     short: '弱视眼找宝藏，健眼干扰变淡，练抗抑制',
     focus: 'anti-suppression',
     needsGlasses: true,
     tone: 'from-pink-100 to-rose-50',
     minutesHint: '3–5 分钟',
+  },
+  {
+    id: 'vergenceJump',
+    title: '近远跳跳',
+    abbr: '近远',
+    short: '近景大框和远景小框之间跳着点，练集合散',
+    focus: 'vergence',
+    needsGlasses: false,
+    tone: 'from-fuchsia-100 to-violet-50',
+    minutesHint: '2–4 分钟',
   },
 ]
 

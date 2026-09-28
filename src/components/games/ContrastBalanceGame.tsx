@@ -8,6 +8,7 @@ import { playTone } from '../../lib/audio'
 import { toBlueCss, toRedCss } from '../../lib/colorConfig'
 import { useStageCanvas } from '../../hooks/useStageCanvas'
 import { useColorConfigStore } from '../../store/colorConfigStore'
+import { useTherapyProfileStore } from '../../store/therapyProfileStore'
 import { CanvasStage } from '../CanvasStage'
 import {
   GameControls,
@@ -52,13 +53,16 @@ export function ContrastBalanceGame() {
   const runningRef = useRef(false)
 
   const [phase, setPhase] = useState<'pick' | 'play'>('pick')
-  const [amblyopicEye, setAmblyopicEye] = useState<Eye>('red')
+  const [amblyopicEye, setAmblyopicEye] = useState<Eye>(() =>
+    useTherapyProfileStore.getState().amblyopicEye,
+  )
   const [running, setRunning] = useState(false)
   const [score, setScore] = useState({ hits: 0, misses: 0 })
   const [fellowContrast, setFellowContrast] = useState(0.78)
-  const [message, setMessage] = useState('先选弱视眼：宝藏在那只眼睛里')
+  const [message, setMessage] = useState('先确认弱视眼：宝藏在那只眼睛里')
 
   runningRef.current = running
+  amblyopicRef.current = amblyopicEye
 
   const pushClinical = useCallback(() => {
     setClinical({
@@ -209,6 +213,7 @@ export function ContrastBalanceGame() {
       setMessage('今日训练时间已用完')
       return
     }
+    useTherapyProfileStore.getState().setAmblyopicEye(eye)
     const ability = getGameAbility('contrastBalance')
     const startFellow = fellowContrastForLevel(ability.level)
     amblyopicRef.current = eye
