@@ -1,6 +1,6 @@
-# Vision Therapy
+# 视力小训练营 · Vision Therapy
 
-弱视与斜视辅助训练系统（Web SPA）。面向 7–8 岁儿童，支持红蓝分视校准、Gabor 视敏度训练、抗抑制 / 立体视 / 扫视等游戏与家长看板。
+弱视与斜视辅助训练系统（可安装 PWA）。面向 7–8 岁儿童，支持红蓝分视校准、Gabor 视敏度、抗抑制 / 立体视 / 扫视 / 近远集合散等游戏、家长看板与可选多设备云同步。
 
 详见 [PRD.md](./PRD.md)。
 
@@ -8,8 +8,20 @@
 
 ```bash
 npm install
-npm run dev
+npm run dev          # 本地开发
+npm run build        # 生产构建（含 PWA Service Worker）
+npm run preview      # 预览 dist
+npm run lint
 ```
+
+可选：修改 `public/app-icon.svg` 后执行 `node scripts/gen-icons.mjs` 重新生成 PNG 图标。
+
+## 技术栈
+
+- React 19 + TypeScript + Vite 8 + Tailwind 4 + Zustand
+- 训练记录：IndexedDB（`idb`）；配置 / 打卡：localStorage
+- 可安装离线：`vite-plugin-pwa`（Workbox）
+- 可选云同步：Supabase（匿名登录 + Postgres RLS），未配置 env 时完全本地
 
 ## 平台适配
 
@@ -21,20 +33,32 @@ npm run dev
 | Mac | Safari / Chrome / Edge | 鼠标点击即可，可安装为桌面应用 |
 | Windows PC | Chrome / Edge | 同上，可安装 |
 | Android 平板/手机 | Chrome | 可安装；小屏体验次于 iPad |
-| iOS / Android App | 无需打包 | PWA 即可满足；如需上架应用商店再考虑 Capacitor 封壳 |
+| 应用商店 App | 无需打包 | PWA 即可满足；如需上架再考虑 Capacitor 封壳 |
 
 **PWA 离线**：`vite-plugin-pwa`（Workbox）预缓存构建产物，安装后可离线训练；`autoUpdate` 自动更新。iOS 上应用申请了持久化存储（`navigator.storage.persist()`）以规避 Safari ~7 天未访问清存储；`InstallHint` 会在 iOS Safari 未安装时引导「添加到主屏幕」。距离监测（摄像头）仅在支持 `getUserMedia` 的浏览器上作为选配。
 
 ## 云同步（可选）
 
-默认「仅本地」，训练数据只存在本机 IndexedDB / localStorage。配置 Supabase 后可在多设备（如家里和 iPad）间匿名同步：
+默认「仅本地」，训练数据只存在本机 IndexedDB / localStorage。配置 Supabase 后可在多设备（如家里和 iPad）间匿名同步。
+
+### 开通步骤
 
 1. 新建 Supabase 项目，`Authentication → Providers` 打开 **Anonymous sign-ins**。
 2. 在 `SQL Editor` 执行本仓库的 [`supabase/schema.sql`](supabase/schema.sql)（建表、RLS、同步码 RPC）。
-3. 复制 `.env.example` 为 `.env`，填入 `VITE_SUPABASE_URL` 与 `VITE_SUPABASE_ANON_KEY`，重新构建。
+3. 复制 [`.env.example`](./.env.example) 为 `.env`，填入 `VITE_SUPABASE_URL` 与 `VITE_SUPABASE_ANON_KEY`，重新构建。
 4. 使用：家长区「同步」页 →「生成同步码」，到另一台设备输入该码即可加入同一家庭、合并进度（同步码 24 小时有效）。
 
-隐私：匿名登录、数据按家庭 RLS 隔离、**不收集孩子姓名等个人信息**。会话按 `syncId` 去重合并（append-only），设置类 KV 按更新时间后写覆盖。未配置环境变量时应用完全本地运行、不发起任何网络请求。
+### 会同步什么
+
+| 类型 | 内容 | 合并策略 |
+|------|------|----------|
+| 训练会话 | 每局模块、时长、正确率、反应时、得分、临床字段 | 按 `syncId` 去重并集（append-only，不丢记录） |
+| 进度状态 | 连胜、贴纸、能力档位、今日课表进度 | 按 `updated_at` 后写覆盖（LWW） |
+| 设置 | 红蓝校准、弱视眼、音效、E 目标、墙钟上限、家长 PIN | 同上 LWW |
+
+当日墙钟计时器、一次性庆祝标记、安装提示关闭状态、设备 id 等**不同步**（设备本地）。
+
+隐私：匿名登录、数据按家庭 RLS 隔离、**不收集孩子姓名等个人信息**。未配置环境变量时应用完全本地运行、不发起任何网络请求。
 
 ## 游戏与轮换
 
@@ -53,10 +77,9 @@ npm run dev
 
 ## 当前进度
 
-- [x] 阶段一～四核心模块
-- [x] 细节补强：首页、免责、计时、导出、距离监测
-- [x] 医院式每日轮换清单 + 游戏扩容 + 全屏
-- [x] 增游（扫视 / 立体视 / 对比度平衡 / 近远跳跳）与弱关能力曲线、首页打卡可读性
-- [x] 进步可见（难度级别 + 升级提示 + 家长各关最佳）、里程碑贴纸、音效开关
-- [x] 剂量科学化（有效分钟语义 + 周剂量视图 + 墙钟上限可调 + 20-20-20 微休息）
-- [x] 可安装 PWA + iOS 离线/持久化存储、可选 Supabase 匿名云同步（同步码多设备）
+- [x] 阶段一～四：校准、Gabor、红蓝抗抑制、计时与家长看板 + IndexedDB
+- [x] 细节补强：首页、免责、导出、距离监测、全屏
+- [x] 阶段五～六：游戏库 12 关（含扫视 / 立体视 / 对比度天平 / 近远跳跳）、课表轮换、弱视眼偏好、ability 开局
+- [x] 阶段七：难度可见 + 升级庆祝、里程碑贴纸、音效开关、首页短名
+- [x] 阶段八：剂量科学化（有效分钟语义 + 周剂量 + 墙钟可调 + 20-20-20 微休息）
+- [x] 阶段九：可安装 PWA + iOS 离线/持久化存储、可选 Supabase 匿名云同步（同步码多设备）
