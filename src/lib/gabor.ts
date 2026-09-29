@@ -29,15 +29,15 @@ export interface GaborStimulusState {
 }
 
 export const GABOR_LIMITS = {
-  spatialFrequency: { min: 0.02, max: 0.1 },
+  spatialFrequency: { min: 0.028, max: 0.12 },
   contrast: { min: 0.2, max: 1.0 },
-  sigma: { min: 14, max: 28 },
+  sigma: { min: 10, max: 22 },
   /** Generous search window for kids (was still too short in practice). */
   responseMs: 12000,
   /** Calm pause between trials. */
   interTrialMs: 1800,
   /** Expand clickable area beyond the drawn patch. */
-  hitPaddingPx: 12,
+  hitPaddingPx: 10,
 } as const
 
 /**

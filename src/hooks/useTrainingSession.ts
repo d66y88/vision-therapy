@@ -1,27 +1,21 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { recordAbilityOutcome } from '../lib/abilityProfile'
-import { FocusTracker, getETargetMs } from '../lib/focusScore'
+import { tryDailyCheckIn } from '../lib/checkIn'
+import { FocusTracker } from '../lib/focusScore'
 import { getGameDef, getRotationPeriodIndex, type GameId } from '../lib/gameCatalog'
 import {
-  getCompletedPlaylistIds,
   isCalibrationFresh,
   isOnTodaysPlaylist,
-  isPlaylistComplete,
   markPlaylistGameDone,
   notifyPlaylistAdvance,
 } from '../lib/playlistProgress'
-import { getCurrentStreak, markStreakDay, tryMakeupBridge } from '../lib/streakStore'
-import { syncRewards } from '../lib/rewardsStore'
 import { getDeviceId } from '../lib/deviceId'
 import { requestSync } from '../lib/sync/engine'
 import { average, saveTrainingSession } from '../lib/trainingDb'
 import type { ClinicalMetrics, TrainingModule } from '../lib/trainingTypes'
 import { computeBci } from '../lib/trainingTypes'
 import { useColorConfigStore } from '../store/colorConfigStore'
-import {
-  getLiveEffectiveMs,
-  useTrainingTimerStore,
-} from '../store/trainingTimerStore'
+import { useTrainingTimerStore } from '../store/trainingTimerStore'
 
 interface SessionDraft {
   module: TrainingModule
@@ -59,15 +53,7 @@ function baseClinical(module: TrainingModule): ClinicalMetrics {
 
 /** Dual check-in: playlist complete AND effective minutes ≥ target. */
 function tryCheckIn(): void {
-  if (!isPlaylistComplete()) return
-  const timer = useTrainingTimerStore.getState()
-  const eff = getLiveEffectiveMs(timer)
-  if (eff < getETargetMs()) return
-  markStreakDay()
-  if (getCompletedPlaylistIds().length >= 1) {
-    tryMakeupBridge()
-  }
-  syncRewards(getCurrentStreak())
+  tryDailyCheckIn()
 }
 
 /**

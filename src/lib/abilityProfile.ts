@@ -146,6 +146,11 @@ export function gaborStartContrastForLevel(baseContrast: number, level: number):
   return Math.min(1, Math.max(0.25, baseContrast * factor))
 }
 
+/** Gabor on-screen patch px (higher ability → smaller / harder to spot). */
+export function gaborPatchSizeForLevel(level: number): number {
+  return Math.round(Math.min(48, Math.max(30, 40 - level * 4)))
+}
+
 /** Orient fish start size: higher level → smaller (harder). */
 export function orientStartSizeForLevel(level: number): number {
   return Math.round(Math.min(120, Math.max(52, 96 - level * 10)))
@@ -181,14 +186,14 @@ export function fixateSpeedForLevel(level: number): number {
   return Math.min(85, Math.max(40, 55 + level * 8))
 }
 
-/** BubbleRush spawn gap ms (lower = harder). */
+/** BubbleRush / 扎气球 spawn gap ms (lower = harder). Gentler pace for kids. */
 export function bubbleSpawnGapForLevel(level: number): number {
-  return Math.round(Math.min(1100, Math.max(420, 800 - level * 90)))
+  return Math.round(Math.min(2000, Math.max(1100, 1600 - level * 100)))
 }
 
-/** BubbleRush TTL base ms (lower = harder). */
+/** BubbleRush TTL base ms (lower = harder). Balloons linger longer to pop. */
 export function bubbleTtlForLevel(level: number): number {
-  return Math.round(Math.min(3000, Math.max(1500, 2400 - level * 180)))
+  return Math.round(Math.min(4200, Math.max(2600, 3600 - level * 160)))
 }
 
 /** Memory pair count: 4 / 6 / 8 by ability. */

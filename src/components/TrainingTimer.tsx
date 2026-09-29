@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { tryDailyCheckIn } from '../lib/checkIn'
 import { getETargetMs, getWallCapMs, kidDoseMessage } from '../lib/focusScore'
 import { isPlaylistComplete } from '../lib/playlistProgress'
 import {
@@ -11,8 +12,10 @@ import {
   getBreakRemainingMs,
   getLiveEffectiveMs,
   getLiveElapsedMs,
+  localDayKey,
   useTrainingTimerStore,
 } from '../store/trainingTimerStore'
+import { DoseCelebrateBanner } from './DoseCelebrateBanner'
 
 const REST_TIPS = [
   '向远处绿色景物看看，放松一下眼睛～',
@@ -20,6 +23,8 @@ const REST_TIPS = [
   '闭上眼睛，轻轻转转眼球',
   '看看窗外，数一数远处有几棵树',
 ]
+
+const DOSE_CELEBRATE_KEY = 'vision_e_target_celebrated'
 
 /**
  * Kid-facing dose bar: check-in progress via effective minutes (no formulas).
@@ -83,40 +88,104 @@ export function TrainingTimer() {
   })
   void pulse
 
+  // Rising-edge celebrate when effective minutes first hit today's target.
+  const [celebrate, setCelebrate] = useState<{
+    open: boolean
+    fullCheckIn: boolean
+  }>({ open: false, fullCheckIn: false })
+  const metBeforeRef = useRef(liveEffective >= eTarget)
+  useEffect(() => {
+    const met = liveEffective >= eTarget && eTarget > 0
+    if (met && !metBeforeRef.current) {
+      const day = localDayKey()
+      let already = false
+      try {
+        already = localStorage.getItem(DOSE_CELEBRATE_KEY) === day
+      } catch {
+        already = false
+      }
+      if (!already) {
+        try {
+          localStorage.setItem(DOSE_CELEBRATE_KEY, day)
+        } catch {
+          /* ignore */
+        }
+        const full = tryDailyCheckIn()
+        setCelebrate({ open: true, fullCheckIn: full })
+      }
+    }
+    metBeforeRef.current = met
+  }, [liveEffective, eTarget])
+
+  const onCelebrateDone = useCallback(() => {
+    setCelebrate((c) => ({ ...c, open: false }))
+  }, [])
+
+  const timeMet = liveEffective >= eTarget && eTarget > 0
+
   return (
     <>
-      <div className="rounded-2xl bg-white/90 px-4 py-3 shadow-sm ring-1 ring-sky-100">
+      <div
+        className={`rounded-2xl bg-white/90 px-4 py-3 shadow-sm ring-1 transition ${
+          timeMet
+            ? 'ring-amber-300 shadow-amber-100'
+            : 'ring-sky-100'
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
-          <p className="text-left text-lg font-extrabold text-slate-800">
+          <p className="min-w-0 flex-1 text-left text-base font-extrabold text-slate-800 sm:text-lg">
             {message}
           </p>
-          <span
-            className={`shrink-0 rounded-full px-3 py-1 text-sm font-extrabold ${
-              phase === 'locked'
-                ? 'bg-amber-100 text-amber-800'
-                : phase === 'training'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : liveElapsed >= wallCap
-                    ? 'bg-slate-200 text-slate-600'
-                    : 'bg-sky-100 text-sky-800'
-            }`}
-          >
-            {phase === 'locked'
-              ? '休息'
-              : phase === 'training'
-                ? '训练中'
-                : liveElapsed >= wallCap
-                  ? '今日已满'
-                  : '打卡进度'}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span
+              className={`text-sm font-bold tabular-nums sm:text-base ${
+                timeMet ? 'text-amber-700' : 'text-sky-700'
+              }`}
+            >
+              {formatMmSs(liveEffective)} / {formatMmSs(eTarget)}
+            </span>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-extrabold ${
+                phase === 'locked'
+                  ? 'bg-amber-100 text-amber-800'
+                  : timeMet
+                    ? 'bg-amber-200 text-amber-900'
+                    : phase === 'training'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : liveElapsed >= wallCap
+                        ? 'bg-slate-200 text-slate-600'
+                        : 'bg-sky-100 text-sky-800'
+              }`}
+            >
+              {phase === 'locked'
+                ? '休息'
+                : timeMet
+                  ? playlistDone
+                    ? '打卡完成'
+                    : '时间够啦'
+                  : phase === 'training'
+                    ? '训练中'
+                    : liveElapsed >= wallCap
+                      ? '今日已满'
+                      : '打卡进度'}
+            </span>
+          </div>
         </div>
         <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-[width] duration-300"
+            className={`h-full rounded-full transition-[width] duration-300 ${
+              timeMet ? 'bg-amber-400' : 'bg-emerald-500'
+            }`}
             style={{ width: `${checkInPct}%` }}
           />
         </div>
       </div>
+
+      <DoseCelebrateBanner
+        open={celebrate.open}
+        fullCheckIn={celebrate.fullCheckIn}
+        onDone={onCelebrateDone}
+      />
 
       {microActive && phase !== 'locked' && (
         <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl bg-teal-50 px-4 py-3 ring-1 ring-teal-200">

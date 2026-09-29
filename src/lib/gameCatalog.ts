@@ -137,12 +137,12 @@ export const GAME_CATALOG: GameDef[] = [
   },
   {
     id: 'bubbleRush',
-    title: '泡泡冲冲冲',
-    abbr: '泡泡',
-    short: '四周冒泡泡，又快又准地点破',
+    title: '扎气球',
+    abbr: '气球',
+    short: '四周飘气球，点破有砰声，练周边反应又解压',
     focus: 'reaction',
     needsGlasses: false,
-    tone: 'from-teal-100 to-cyan-50',
+    tone: 'from-rose-100 to-amber-50',
     minutesHint: '2–3 分钟',
   },
   {

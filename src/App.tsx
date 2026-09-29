@@ -75,11 +75,13 @@ function App() {
       }
       if (def?.needsGlasses && !hasPassedSuppressionIntro()) {
         setPendingGame(id)
+        setActiveGame(null)
         setView('intro')
         return
       }
       if (!opts?.skipRitual && showOpeningOnce) {
         setPendingGame(id)
+        setActiveGame(null)
         setRitual('opening')
         setShowOpeningOnce(false)
         return
@@ -175,6 +177,15 @@ function App() {
     const inActivePlay = shell === 'kid' && view === 'play' && activeGame != null
     if (!inActivePlay) {
       useTrainingTimerStore.getState().pauseTraining()
+    }
+  }, [shell, view, activeGame])
+
+  // Home playlist chips sit lower on the page; without a reset, entering a game
+  // keeps that scroll offset and the GameShell「全屏」button sits above the
+  // sticky nav (still in DOM, but invisible). Always land at the top of play.
+  useEffect(() => {
+    if (shell === 'kid' && view === 'play' && activeGame != null) {
+      window.scrollTo(0, 0)
     }
   }, [shell, view, activeGame])
 

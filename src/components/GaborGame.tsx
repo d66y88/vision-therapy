@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTrainingSession } from '../hooks/useTrainingSession'
 import {
   getGameAbility,
+  gaborPatchSizeForLevel,
   gaborStartContrastForLevel,
 } from '../lib/abilityProfile'
 import { playTone } from '../lib/audio'
@@ -53,7 +54,8 @@ interface HudState {
 }
 
 const GRID = 4
-const PATCH_SIZE = 64
+/** Default drawn patch size; overridden per session by ability level. */
+const PATCH_SIZE_DEFAULT = 40
 const CONFETTI_COLORS = ['#ff8a6b', '#ffd56b', '#7ddea5', '#7ec8e3', '#f472b6']
 /** Refresh noise every trial so backdrop stays clearly speckled. */
 const NOISE_REFRESH_EVERY = 1
@@ -77,6 +79,7 @@ function spawnConfetti(x: number, y: number): Particle[] {
 function pickPatchPlacement(
   width: number,
   height: number,
+  patchSize: number,
   exclude?: { gridX: number; gridY: number } | null,
 ): PatchPlacement {
   const cellW = width / GRID
@@ -90,7 +93,7 @@ function pickPatchPlacement(
   }
   const pool = cells.length > 0 ? cells : [{ gridX: 0, gridY: 0 }]
   const pick = pool[Math.floor(Math.random() * pool.length)]!
-  const size = PATCH_SIZE
+  const size = Math.min(patchSize, Math.max(24, Math.floor(Math.min(cellW, cellH) * 0.72)))
   return {
     pixelX: pick.gridX * cellW + (cellW - size) / 2,
     pixelY: pick.gridY * cellH + (cellH - size) / 2,
@@ -106,6 +109,7 @@ export function GaborGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const noiseCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const patchCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const patchSizeRef = useRef(PATCH_SIZE_DEFAULT)
   const staircaseRef = useRef<StaircaseState>(createInitialStaircase())
   const placementRef = useRef<PatchPlacement | null>(null)
   const particlesRef = useRef<Particle[]>([])
@@ -145,10 +149,15 @@ export function GaborGame() {
     if (!noiseCanvasRef.current) {
       noiseCanvasRef.current = document.createElement('canvas')
     }
-    if (!patchCanvasRef.current) {
+    const patchPx = patchSizeRef.current
+    if (
+      !patchCanvasRef.current ||
+      patchCanvasRef.current.width !== patchPx ||
+      patchCanvasRef.current.height !== patchPx
+    ) {
       patchCanvasRef.current = document.createElement('canvas')
-      patchCanvasRef.current.width = PATCH_SIZE
-      patchCanvasRef.current.height = PATCH_SIZE
+      patchCanvasRef.current.width = patchPx
+      patchCanvasRef.current.height = patchPx
     }
     const noise = noiseCanvasRef.current
     if (noise.width !== w || noise.height !== h) {
@@ -182,15 +191,21 @@ export function GaborGame() {
     }
 
     staircaseRef.current = randomizeOrientation(staircaseRef.current)
+    const patchPx = patchSizeRef.current
     const patchData = renderGaborImageData(
-      PATCH_SIZE,
+      patchPx,
       staircaseRef.current.stimulus,
     )
     const patch = patchCanvasRef.current!
     const patchCtx = patch.getContext('2d')!
     patchCtx.putImageData(patchData, 0, 0)
 
-    placementRef.current = pickPatchPlacement(w, h, placementRef.current)
+    placementRef.current = pickPatchPlacement(
+      w,
+      h,
+      patchPx,
+      placementRef.current,
+    )
     trialStartedAtRef.current = performance.now()
     awaitingRef.current = true
     trialCountRef.current += 1
@@ -484,6 +499,7 @@ export function GaborGame() {
           }
           const ability = getGameAbility('gabor')
           const startC = gaborStartContrastForLevel(1.0, ability.level)
+          patchSizeRef.current = gaborPatchSizeForLevel(ability.level)
           staircaseRef.current = createInitialStaircase(startC)
           setSamples([])
           setScore({ hits: 0, misses: 0, streak: 0 })

@@ -26,7 +26,8 @@ export interface StaircaseUpdateResult {
 }
 
 /**
- * Create the initial staircase stimulus (easy, kid-friendly start).
+ * Create the initial staircase stimulus.
+ * Starts smaller / finer than early kid builds (patch size handled in GaborGame).
  */
 export function createInitialStaircase(startContrast?: number): StaircaseState {
   const contrast =
@@ -35,10 +36,10 @@ export function createInitialStaircase(startContrast?: number): StaircaseState {
       : 1.0
   return {
     stimulus: {
-      spatialFrequency: 0.022,
+      spatialFrequency: 0.04,
       contrast,
       orientationDeg: Math.random() * 180,
-      sigma: 20,
+      sigma: 13,
     },
     successiveHits: 0,
     step: 0,

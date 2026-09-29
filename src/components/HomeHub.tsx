@@ -21,7 +21,6 @@ import { getStickerShelf, takeNewSticker } from '../lib/rewardsStore'
 import { getCurrentStreak } from '../lib/streakStore'
 import { useColorConfigStore } from '../store/colorConfigStore'
 import {
-  formatMmSs,
   getLiveEffectiveMs,
   useTrainingTimerStore,
 } from '../store/trainingTimerStore'
@@ -131,21 +130,6 @@ export function HomeHub({
               {s.earned ? s.emoji : '🔒'}
             </span>
           ))}
-        </div>
-      </div>
-
-      <div className="mb-5 rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-sky-100">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-base font-extrabold text-slate-800">打卡时间</p>
-          <p className="text-base font-bold tabular-nums text-sky-700">
-            {formatMmSs(liveEff)} / {formatMmSs(eTarget)}
-          </p>
-        </div>
-        <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-emerald-500 transition-[width] duration-300"
-            style={{ width: `${dosePct}%` }}
-          />
         </div>
       </div>
 
