@@ -62,7 +62,8 @@ function App() {
       activeGame === 'fixate' ||
       activeGame === 'bubbleRush' ||
       activeGame === 'saccadeJump' ||
-      activeGame === 'vergenceJump')
+      activeGame === 'vergenceJump' ||
+      activeGame === 'beadString')
 
   const launchGame = useCallback(
     (id: GameId, opts?: { skipRitual?: boolean }) => {

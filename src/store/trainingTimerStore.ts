@@ -229,10 +229,18 @@ function accrualDelta(
 ): { wallDelta: number; effDelta: number; lastAccrueAt: number } | null {
   if (state.phase !== 'training' || state.segmentStartedAt == null) return null
   const from = state.lastAccrueAt ?? state.segmentStartedAt
-  const wallDelta = Math.max(0, now - from)
-  if (wallDelta <= 0) return null
-  const effDelta = wallDelta * accrualMultiplier(state.focusScore)
-  return { wallDelta, effDelta, lastAccrueAt: now }
+  const rawWall = Math.max(0, now - from)
+  if (rawWall <= 0) return null
+  const mult = accrualMultiplier(state.focusScore)
+  // Idle (mult=0): freeze both clocks but advance cursor so AFK isn't backfilled.
+  if (mult <= 0) {
+    return { wallDelta: 0, effDelta: 0, lastAccrueAt: now }
+  }
+  return {
+    wallDelta: rawWall,
+    effDelta: rawWall * mult,
+    lastAccrueAt: now,
+  }
 }
 
 export const useTrainingTimerStore = create<TrainingTimerState>((set, get) => ({
@@ -433,6 +441,7 @@ export function getLiveElapsedMs(
   now = Date.now(),
 ): number {
   if (state.phase === 'training' && state.segmentStartedAt != null) {
+    if (accrualMultiplier(state.focusScore) <= 0) return state.elapsedMs
     const from = state.lastAccrueAt ?? state.segmentStartedAt
     return Math.min(getWallCapMs(), state.elapsedMs + Math.max(0, now - from))
   }
@@ -450,9 +459,11 @@ export function getLiveEffectiveMs(
   now = Date.now(),
 ): number {
   if (state.phase === 'training' && state.segmentStartedAt != null) {
+    const mult = accrualMultiplier(state.focusScore)
+    if (mult <= 0) return state.effectiveMs
     const from = state.lastAccrueAt ?? state.segmentStartedAt
     const wallDelta = Math.max(0, now - from)
-    return state.effectiveMs + wallDelta * accrualMultiplier(state.focusScore)
+    return state.effectiveMs + wallDelta * mult
   }
   return state.effectiveMs
 }

@@ -150,11 +150,13 @@ export function TrainingTimer() {
                   ? 'bg-amber-100 text-amber-800'
                   : timeMet
                     ? 'bg-amber-200 text-amber-900'
-                    : phase === 'training'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : liveElapsed >= wallCap
-                        ? 'bg-slate-200 text-slate-600'
-                        : 'bg-sky-100 text-sky-800'
+                    : phase === 'training' && focusScore <= 0
+                      ? 'bg-slate-200 text-slate-600'
+                      : phase === 'training'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : liveElapsed >= wallCap
+                          ? 'bg-slate-200 text-slate-600'
+                          : 'bg-sky-100 text-sky-800'
               }`}
             >
               {phase === 'locked'
@@ -163,11 +165,13 @@ export function TrainingTimer() {
                   ? playlistDone
                     ? '打卡完成'
                     : '时间够啦'
-                  : phase === 'training'
-                    ? '训练中'
-                    : liveElapsed >= wallCap
-                      ? '今日已满'
-                      : '打卡进度'}
+                  : phase === 'training' && focusScore <= 0
+                    ? '暂停计时'
+                    : phase === 'training'
+                      ? '训练中'
+                      : liveElapsed >= wallCap
+                        ? '今日已满'
+                        : '打卡进度'}
             </span>
           </div>
         </div>

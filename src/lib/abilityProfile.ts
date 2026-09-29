@@ -227,3 +227,26 @@ export function dichopticObsSpawnMsForLevel(level: number): number {
 export function vergenceCueMsForLevel(level: number): number {
   return Math.round(Math.min(2600, Math.max(1100, 2000 - level * 200)))
 }
+
+/** BeadString: beads per bracelet (10 / 12 / 16 / 20 by ability). */
+export function beadGoalForLevel(level: number): number {
+  if (level <= -1) return 10
+  if (level === 0) return 12
+  if (level === 1) return 16
+  return 20
+}
+
+/** BeadString: hole radius px (smaller = harder alignment). */
+export function beadHoleForLevel(level: number): number {
+  return Math.round(Math.min(14, Math.max(6, 11 - level * 1.2)))
+}
+
+/** BeadString: tip hit tolerance multiplier (>1 easier). */
+export function beadToleranceForLevel(level: number): number {
+  return Math.min(1.45, Math.max(0.85, 1.15 - level * 0.08))
+}
+
+/** BeadString: how many spare beads sit in the pile (beyond the goal). */
+export function beadPileExtraForLevel(level: number): number {
+  return Math.round(Math.min(14, Math.max(6, 8 + level)) )
+}

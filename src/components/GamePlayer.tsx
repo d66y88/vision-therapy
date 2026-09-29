@@ -11,6 +11,7 @@ import { SaccadeJumpGame } from './games/SaccadeJumpGame'
 import { StarPopGame } from './games/StarPopGame'
 import { StereoNearGame } from './games/StereoNearGame'
 import { VergenceJumpGame } from './games/VergenceJumpGame'
+import { BeadStringGame } from './games/BeadStringGame'
 
 export function GamePlayer({ gameId }: { gameId: GameId }) {
   switch (gameId) {
@@ -38,6 +39,8 @@ export function GamePlayer({ gameId }: { gameId: GameId }) {
       return <ContrastBalanceGame />
     case 'vergenceJump':
       return <VergenceJumpGame />
+    case 'beadString':
+      return <BeadStringGame />
     default:
       return null
   }

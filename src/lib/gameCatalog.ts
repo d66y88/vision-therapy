@@ -13,6 +13,7 @@ export type GameId =
   | 'stereoNear'
   | 'contrastBalance'
   | 'vergenceJump'
+  | 'beadString'
 
 export type GameFocus =
   | 'acuity'
@@ -24,6 +25,7 @@ export type GameFocus =
   | 'saccade'
   | 'stereo'
   | 'vergence'
+  | 'fine-motor'
 
 export interface GameDef {
   id: GameId
@@ -58,6 +60,8 @@ export function focusEmoji(focus: GameFocus): string {
       return '🧊'
     case 'vergence':
       return '🔭'
+    case 'fine-motor':
+      return '📿'
     default:
       return '⭐'
   }
@@ -184,6 +188,16 @@ export const GAME_CATALOG: GameDef[] = [
     needsGlasses: false,
     tone: 'from-fuchsia-100 to-violet-50',
     minutesHint: '2–4 分钟',
+  },
+  {
+    id: 'beadString',
+    title: '串珠珠',
+    abbr: '串珠',
+    short: '从珠堆随便挑，穿满一串戴上手腕，练近距精细对准',
+    focus: 'fine-motor',
+    needsGlasses: false,
+    tone: 'from-amber-100 to-orange-50',
+    minutesHint: '3–5 分钟',
   },
 ]
 

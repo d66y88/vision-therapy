@@ -1,10 +1,12 @@
 /**
  * Behavior-based focus scoring → effective training minutes.
- * focusScore ∈ [0.7, 1.25]: distracted discounts, focused boosts wall-clock accrual.
+ * focusScore ∈ [0.7, 1.25] while engaged; 0 when idle long enough to freeze the clock.
  */
 
 export const FOCUS_SCORE_MIN = 0.7
 export const FOCUS_SCORE_MAX = 1.25
+/** No interaction for this long → wall + effective clocks freeze (not on-task). */
+export const IDLE_PAUSE_MS = 10_000
 /** Default effective-minute target for daily check-in (18 min). */
 export const DEFAULT_E_TARGET_MS = 18 * 60 * 1000
 /** Wall-clock hard cap (30 min) — never exceeded. */
@@ -58,10 +60,11 @@ export function clampFocusScore(n: number): number {
 /**
  * Multiplier applied to wall time when accruing effective (check-in) minutes.
  * Capped at 1.0 so focus can only DISCOUNT (distraction), never inflate the
- * therapeutic clock beyond real on-task time — dosing science measures actual
- * time on task. focusScore's >1 range is kept purely for the quality metric.
+ * therapeutic clock beyond real on-task time. 0 = idle pause (clocks freeze).
+ * focusScore's >1 range is kept purely for the quality metric.
  */
 export function accrualMultiplier(focusScore: number): number {
+  if (focusScore <= 0) return 0
   return Math.min(1, focusScore)
 }
 
@@ -100,15 +103,22 @@ export class FocusTracker {
     this.postureOk = ok
   }
 
+  /** True when the kid has interacted recently enough to count as on-task. */
+  isEngaged(now = Date.now()): boolean {
+    return now - this.lastInteractAt <= IDLE_PAUSE_MS
+  }
+
   /**
    * Current multiplier for effective-ms accrual.
+   * Returns 0 after IDLE_PAUSE_MS with no interaction → clocks freeze.
    */
   score(now = Date.now()): number {
-    let s = 1
-
     const idleMs = now - this.lastInteractAt
-    if (idleMs > 12_000) s -= 0.25
-    else if (idleMs > 8_000) s -= 0.15
+    // AFK with game open must not burn daily dose / wall cap.
+    if (idleMs > IDLE_PAUSE_MS) return 0
+
+    let s = 1
+    if (idleMs > 8_000) s -= 0.15
 
     if (this.outcomes.length >= 3) {
       const hits = this.outcomes.filter((o) => o === 'hit').length
